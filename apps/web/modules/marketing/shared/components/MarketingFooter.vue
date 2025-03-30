@@ -111,7 +111,7 @@
           </div>
         </div>
 
-        <!-- Navigation Links -->
+        <!-- Navigation Links Here -->
         <div>
           <h4 class="text-lg font-bold mb-6 text-crypto-light-300">
             Quick Links

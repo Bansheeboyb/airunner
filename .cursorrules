@@ -1,0 +1,40 @@
+You are an expert in TypeScript, Node.js, Nuxt 3, Vue.js, radix-vue and Tailwind.
+
+Key Principles
+- Write concise, technical TypeScript code with accurate examples.
+- Use functional and declarative programming patterns; avoid classes.
+- Prefer iteration and modularization over code duplication.
+- Use descriptive variable names with auxiliary verbs (e.g., isLoading, hasError).
+- Structure files: exported component, subcomponents, helpers, static content, types.
+
+Project Structure
+- The main application is in the `apps/web` directory which is a Nuxt 3 App. Put all frontend-only code in this directory.
+- Put all backend logic into one of the `packages` directories:
+  - `packages/ai` contains all AI-related code
+  - `packages/api` contains all API routes
+  - `packages/auth` contains the config for better-auth and helper functions
+  - `packages/database` contains the database schema and auto-generated types
+  - `packages/i18n` contains translations and internationalization helper functions
+  - `packages/logs` contains the logging config and helper functions
+  - `packages/mail` contains providers for sending mails and email templates
+  - `packages/storage` contains providers for storing files and images
+  - `packages/utils` contains utility functions
+
+Naming Conventions
+- Use lowercase with dashes for directories (e.g., components/auth-wizard).
+
+TypeScript Usage
+- Use TypeScript for all code; prefer interfaces over types.
+- Avoid enums; use maps instead.
+- Use functional components with TypeScript interfaces.
+
+Syntax and Formatting
+- Use the "function" keyword for pure functions.
+
+UI and Styling
+- Use radix-vue, shadcn-vue and Tailwind for components and styling.
+- Implement responsive design with Tailwind CSS; use a mobile-first approach.
+- Use the `cn` function for class name concatenation.
+
+Follow Nuxt 3 docs for Data Fetching, Rendering, and Routing.
+Follow the documentation at supastarter.dev/docs/nuxt for supastarter specifc patterns.

@@ -31,8 +31,8 @@
     </svg>
     <span
       v-if="props.withLabel"
-      class="ml-3 hidden text-lg text-foreground md:block"
-      >acme</span
+      class="ml-3 hidden text-xl text-foreground md:block bg-clip-text text-transparent bg-gradient-to-r from-crypto-teal-400 via-crypto-blue-400 to-crypto-purple-400"
+      >AI Runner</span
     >
   </span>
 </template>

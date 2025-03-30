@@ -79,7 +79,7 @@
             v-for="menuItem of menuItems"
             :key="menuItem.to"
             :to="menuItem.to"
-            class="block shrink-0 px-3 py-2 text-sm text-foreground/80"
+            class="block shrink-0 px-3 py-2 mt-2 text-md text-foreground/80 text-crypto-light-500 hover:text-crypto-blue-400 transition-colors"
             :class="[isMenuItemActive(menuItem.to) ? 'font-bold' : '']"
           >
             {{ menuItem.label }}
@@ -87,7 +87,7 @@
         </div>
 
         <div class="flex flex-1 items-center justify-end gap-3">
-          <ColorModeToggle />
+          <!-- <ColorModeToggle /> -->
           <LocaleSwitch />
 
           <Sheet v-model:open="mobileMenuOpen">

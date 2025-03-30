@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@unhead/vue": "^1.11.14",
+    "crypto": "^1.0.1",
     "eslint": "8.57.0",
     "eslint-config-custom": "workspace:*",
     "googleapis": "^148.0.0",

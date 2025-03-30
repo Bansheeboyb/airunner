@@ -441,7 +441,10 @@
         "title": "Mitglieder"
       },
       "subtitle": "Verwalte deine Teameinstellungen und Mitglieder",
-      "title": "Team"
+      "title": "Team",
+      "updateHFToken": {
+        "description": "Um Ihr HuggingFace-Token zu aktualisieren, geben Sie unten das neue ein und klicken Sie auf „Speichern“"
+      }
     },
     "title": "Einstellungen"
   },

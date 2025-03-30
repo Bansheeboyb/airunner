@@ -397,6 +397,11 @@
         "submit": "Delete team",
         "title": "Delete team"
       },
+      "updateHFToken": {
+        "description": "To update your HuggingFace token, enter the new one below and click save.",
+        "note": "Please enter a valid HuggingFace token.",
+        "title": "HFT token"
+      },
       "members": {
         "activeMembers": "Active members",
         "invitations": {

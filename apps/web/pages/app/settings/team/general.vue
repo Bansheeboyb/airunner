@@ -26,6 +26,10 @@
       :initialValue="currentTeam.name"
       :teamId="currentTeam.id"
     />
+    <SaasChangeTeamHFTokenForm
+      :initialValue="currentTeam.encryptedHFApiKey"
+      :teamId="currentTeam.id"
+    />
     <SaasDeleteTeamForm />
   </div>
 </template>

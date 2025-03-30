@@ -16,7 +16,7 @@ export const createVm = protectedProcedure
   )
   .mutation(async ({ input, ctx }) => {
     try {
-      // Get user and organization from thee context
+      // Get user and organization from the context
       const { user } = ctx;
       const organizationId = user.organizationId || "default-org";
       const userId = user.id;
@@ -109,8 +109,6 @@ spec:
           value: "${organizationId}"
         - name: USER_ID
           value: "${userId}" 
-        - name: HF_TOKEN
-          value: "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"
       stdin: false
       tty: false
   restartPolicy: Always

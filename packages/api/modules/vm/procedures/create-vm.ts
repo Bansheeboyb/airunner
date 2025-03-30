@@ -108,7 +108,9 @@ spec:
         - name: ORGANIZATION_ID
           value: "${organizationId}"
         - name: USER_ID
-          value: "${userId}" 
+          value: "${userId}"
+        - name: HF_TOKEN
+          value: "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" 
       stdin: false
       tty: false
   restartPolicy: Always

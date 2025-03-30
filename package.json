@@ -26,7 +26,10 @@
     "@unhead/vue": "^1.11.14",
     "eslint": "8.57.0",
     "eslint-config-custom": "workspace:*",
+    "googleapis": "^148.0.0",
     "gsap": "^3.12.7",
+    "install": "^0.13.0",
+    "npm": "^11.2.0",
     "turbo": "^2.3.3"
   }
 }

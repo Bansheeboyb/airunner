@@ -15,11 +15,6 @@
         <!-- Logo and About Column -->
         <div class="space-y-6">
           <div class="flex items-center">
-            <img
-              src="../icons/logo.svg"
-              alt="AI Runner Logo"
-              class="h-10 w-10"
-            />
             <span
               class="text-xl font-bold ai-gradient-text crypto-gradient-text ml-2"
               >AI Runner</span

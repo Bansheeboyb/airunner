@@ -167,7 +167,8 @@
       "admin": "Administrator",
       "aiDemo": "AI-Demo",
       "dashboard": "Dashboard",
-      "settings": "Einstellungen"
+      "settings": "Einstellungen",
+      "modelLibrary": " Modellbibliothek"
     },
     "sidebar": {
       "createTeam": "Erstelle ein neues Team"

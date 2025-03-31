@@ -47,12 +47,12 @@
 
       <!-- Color mode selection -->
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger>
+        <!-- <DropdownMenuSubTrigger>
           <ColorModeToggleIcon />
           <div class="ml-2">
             {{ $t("dashboard.userMenu.colorMode") }}
           </div>
-        </DropdownMenuSubTrigger>
+        </DropdownMenuSubTrigger> -->
         <DropdownMenuPortal>
           <DropdownMenuSubContent avoid-collisions>
             <ColorModeToggleRadioGroup />

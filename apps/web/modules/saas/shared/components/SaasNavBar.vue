@@ -27,9 +27,9 @@
         to: "/app/dashboard",
       },
       {
-        label: t("dashboard.menu.aiDemo"),
+        label: t("dashboard.menu.modelLibrary"),
         icon: Wand2Icon,
-        to: "/app/ai-demo",
+        to: "/app/model-library",
       },
       {
         label: t("dashboard.menu.settings"),

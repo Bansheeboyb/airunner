@@ -165,7 +165,7 @@
   "dashboard": {
     "menu": {
       "admin": "Admin",
-      "aiDemo": "AI Demo",
+      "modelLibrary": "Model Library",
       "dashboard": "Dashboard",
       "settings": "Settings"
     },

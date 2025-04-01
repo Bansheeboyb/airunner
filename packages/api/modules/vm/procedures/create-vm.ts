@@ -4,6 +4,121 @@ import { google } from "googleapis";
 import { createHash } from "crypto";
 import { JWT } from "google-auth-library";
 
+// Add a status check procedure
+export const checkVmStatus = protectedProcedure
+  .input(
+    z.object({
+      vmName: z.string(),
+      zone: z.string(),
+    }),
+  )
+  .query(async ({ input }) => {
+    try {
+      console.log("Starting VM status check for:", input.vmName);
+
+      // Fix private key newline formatting issues
+      let privateKey = process.env.GCP_PRIVATE_KEY || "";
+      if (privateKey) {
+        privateKey = privateKey.replace(/\\n/g, "\n");
+      }
+
+      // Create JWT client with service account credentials
+      const client = new JWT({
+        email: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+        key: privateKey,
+        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
+      });
+
+      // Create Compute Engine client with our JWT client
+      const compute = google.compute({
+        version: "v1",
+        auth: client,
+      });
+
+      const projectId = process.env.GCP_PROJECT_ID;
+
+      console.log("Sending status check request for VM:", input.vmName);
+      console.log("Zone:", input.zone);
+      console.log("Project ID:", projectId);
+
+      // Make the API call to get VM status
+      const response = await compute.instances.get({
+        project: projectId,
+        zone: input.zone,
+        instance: input.vmName,
+      });
+
+      // Detailed logging of response
+      console.log("VM status check response received");
+      console.log("Response type:", typeof response.data);
+      console.log("Response keys:", Object.keys(response.data));
+
+      // Log specific important fields
+      console.log("VM status:", response.data.status);
+      console.log("VM zone:", response.data.zone);
+      console.log("VM id:", response.data.id);
+
+      // Log network interface info if it exists
+      if (
+        response.data.networkInterfaces &&
+        response.data.networkInterfaces.length > 0
+      ) {
+        console.log("Network interfaces available");
+        try {
+          const networkInterface = response.data.networkInterfaces[0];
+          console.log("Network interface keys:", Object.keys(networkInterface));
+
+          // Log access configs (for external IP)
+          if (
+            networkInterface.accessConfigs &&
+            networkInterface.accessConfigs.length > 0
+          ) {
+            console.log("Access configs available");
+            console.log(
+              "External IP:",
+              networkInterface.accessConfigs[0].natIP,
+            );
+          } else {
+            console.log("No access configs found");
+          }
+        } catch (niError) {
+          console.error("Error parsing network interfaces:", niError);
+        }
+      } else {
+        console.log("No network interfaces found");
+      }
+
+      // Return a safer version of the response
+      return {
+        status: response.data.status || "UNKNOWN",
+        id: response.data.id,
+        zone: response.data.zone,
+        name: response.data.name,
+        externalIp:
+          response.data.networkInterfaces?.[0]?.accessConfigs?.[0]?.natIP ||
+          null,
+        // Add any other fields you need
+      };
+    } catch (error) {
+      console.error("Error checking VM status:", error);
+
+      // More detailed error logging
+      if (error.response) {
+        console.error("Response status:", error.response.status);
+        console.error("Response data:", JSON.stringify(error.response.data));
+      }
+
+      if (error.request) {
+        console.error("Request was made but no response received");
+      }
+
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
+
+      throw new Error(`Error checking status: ${error.message}`);
+    }
+  });
+
 export const createVm = protectedProcedure
   .input(
     z.object({
@@ -239,6 +354,7 @@ iptables -w -A INPUT -p tcp --dport 8000 -j ACCEPT
         message: "VM creation initiated",
         organizationId,
         userId,
+        zone: zoneStr, // Include zone for status checks
       };
     } catch (error) {
       console.error("Error creating VM:", error);

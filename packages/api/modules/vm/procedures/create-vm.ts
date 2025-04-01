@@ -4,8 +4,6 @@ import { google } from "googleapis";
 import { createHash } from "crypto";
 import { OAuth2Client } from "google-auth-library";
 
-const authClient = new OAuth2Client();
-
 export const createVm = protectedProcedure
   .input(
     z.object({
@@ -36,18 +34,29 @@ export const createVm = protectedProcedure
         .toLowerCase()
         .replace(/\s/g, "-")}-${uniqueId}`;
 
-      // Authenticate with GCP using application default credentials
-      const auth = new google.auth.GoogleAuth({
-        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
-      });
+      // Define the GCP credentials function inside the procedure to avoid initialization issues
+      const getGCPCredentials = () => {
+        return process.env.GCP_PRIVATE_KEY
+          ? {
+              credentials: {
+                client_email: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+                private_key: process.env.GCP_PRIVATE_KEY,
+              },
+              projectId: process.env.GCP_PROJECT_ID,
+            }
+          : {};
+      };
 
-      const projectId = await auth.getProjectId();
-      const authClient = await auth.getClient();
+      // Use the GCP credentials from environment variables
+      const gcpCredentials = getGCPCredentials();
+      const projectId =
+        gcpCredentials.projectId ||
+        (await new google.auth.GoogleAuth().getProjectId());
 
-      // Create Compute Engine client
+      // Create Compute Engine client with our service account credentials
       const compute = google.compute({
         version: "v1",
-        auth: authClient as OAuth2Client,
+        auth: new google.auth.GoogleAuth(gcpCredentials),
       });
 
       // Configure machine type based on parameters
@@ -59,34 +68,7 @@ export const createVm = protectedProcedure
       }-${input.memoryGB * 1024}`;
 
       // Define VM creation parameters
-      const vmConfig: {
-        name: string;
-        machineType: string;
-        tags: { items: string[] };
-        labels: {
-          organization_id: string;
-          user_id: string;
-          created_by: string;
-          model_name: string;
-          team_id?: string;
-        };
-        disks: {
-          boot: boolean;
-          autoDelete: boolean;
-          initializeParams: { sourceImage: string; diskSizeGb: string };
-        }[];
-        networkInterfaces: {
-          network: string;
-          accessConfigs: { type: string; name: string }[];
-        }[];
-        metadata: { items: { key: string; value: string }[] };
-        scheduling: { preemptible: boolean; onHostMaintenance?: string };
-        serviceAccounts: { email: string; scopes: string[] }[];
-        guestAccelerators?: {
-          acceleratorType: string;
-          acceleratorCount: number;
-        }[];
-      } = {
+      const vmConfig = {
         name: vmName,
         machineType: machineType,
         tags: {

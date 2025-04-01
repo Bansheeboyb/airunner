@@ -34,30 +34,53 @@ export const createVm = protectedProcedure
         .toLowerCase()
         .replace(/\s/g, "-")}-${uniqueId}`;
 
-      // Define the GCP credentials function inside the procedure to avoid initialization issues
-      const getGCPCredentials = () => {
-        return process.env.GCP_PRIVATE_KEY
-          ? {
-              credentials: {
-                client_email: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
-                private_key: process.env.GCP_PRIVATE_KEY,
-              },
-              projectId: process.env.GCP_PROJECT_ID,
-            }
-          : {};
-      };
+      // Add debug logging to check environment variables
+      console.log("GCP Auth Status:", !!process.env.GCP_PRIVATE_KEY);
+      console.log("Project ID:", process.env.GCP_PROJECT_ID);
+      console.log(
+        "Service Account Email:",
+        process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+      );
 
-      // Use the GCP credentials from environment variables
-      const gcpCredentials = getGCPCredentials();
-      const projectId =
-        gcpCredentials.projectId ||
-        (await new google.auth.GoogleAuth().getProjectId());
+      // Fix private key newline formatting issues
+      let privateKey = process.env.GCP_PRIVATE_KEY || "";
+      if (privateKey) {
+        privateKey = privateKey.replace(/\\n/g, "\n");
+      }
 
-      // Create Compute Engine client with our service account credentials
+      // Check if we have valid credentials
+      if (
+        !privateKey ||
+        !process.env.GCP_SERVICE_ACCOUNT_EMAIL ||
+        !process.env.GCP_PROJECT_ID
+      ) {
+        console.error("Missing GCP credentials in environment variables");
+        throw new Error("Invalid or missing GCP credentials");
+      }
+
+      // Use the credentials directly with OAuth2Client
+      const authClient = new OAuth2Client();
+      authClient.fromJSON({
+        type: "service_account",
+        project_id: process.env.GCP_PROJECT_ID,
+        private_key: privateKey,
+        client_email: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+      });
+
+      // Create Compute Engine client with our auth client
       const compute = google.compute({
         version: "v1",
-        auth: new google.auth.GoogleAuth(gcpCredentials),
+        auth: authClient,
       });
+
+      // Log successful auth setup
+      console.log(
+        "GCP Auth setup complete for project:",
+        process.env.GCP_PROJECT_ID,
+      );
+
+      // Use project ID from environment
+      const projectId = process.env.GCP_PROJECT_ID;
 
       // Configure machine type based on parameters
       const zoneStr = input.region.includes("-")
@@ -168,12 +191,17 @@ iptables -w -A INPUT -p tcp --dport 8000 -j ACCEPT
         vmConfig.scheduling.onHostMaintenance = "TERMINATE";
       }
 
+      // Log VM creation attempt
+      console.log("Attempting to create VM:", vmName, "in zone:", zoneStr);
+
       // Make the API call to create the VM
       const response = await compute.instances.insert({
         project: projectId,
         zone: zoneStr,
         requestBody: vmConfig,
       });
+
+      console.log("VM creation successful, operation ID:", response.data.id);
 
       // Return the operation data
       return {
@@ -187,6 +215,11 @@ iptables -w -A INPUT -p tcp --dport 8000 -j ACCEPT
       };
     } catch (error) {
       console.error("Error creating VM:", error);
+      // More detailed error logging
+      if (error.response) {
+        console.error("Response error data:", error.response.data);
+        console.error("Response error status:", error.response.status);
+      }
       throw new Error(error.message || "Unknown error creating VM");
     }
   });

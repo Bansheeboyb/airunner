@@ -2,6 +2,9 @@ import { z } from "zod";
 import { protectedProcedure } from "../../trpc";
 import { google } from "googleapis";
 import { createHash } from "crypto";
+import { OAuth2Client } from "google-auth-library";
+
+const authClient = new OAuth2Client();
 
 export const createVm = protectedProcedure
   .input(
@@ -12,6 +15,7 @@ export const createVm = protectedProcedure
       gpuType: z.string().optional(),
       gpuCount: z.number().int().optional(),
       region: z.string().default("us-central1"),
+      teamId: z.string(),
     }),
   )
   .mutation(async ({ input, ctx }) => {
@@ -43,7 +47,7 @@ export const createVm = protectedProcedure
       // Create Compute Engine client
       const compute = google.compute({
         version: "v1",
-        auth: authClient,
+        auth: authClient as OAuth2Client,
       });
 
       // Configure machine type based on parameters
@@ -55,11 +59,42 @@ export const createVm = protectedProcedure
       }-${input.memoryGB * 1024}`;
 
       // Define VM creation parameters
-      const vmConfig = {
+      const vmConfig: {
+        name: string;
+        machineType: string;
+        tags: { items: string[] };
+        labels: {
+          organization_id: string;
+          user_id: string;
+          created_by: string;
+          model_name: string;
+          team_id?: string;
+        };
+        disks: {
+          boot: boolean;
+          autoDelete: boolean;
+          initializeParams: { sourceImage: string; diskSizeGb: string };
+        }[];
+        networkInterfaces: {
+          network: string;
+          accessConfigs: { type: string; name: string }[];
+        }[];
+        metadata: { items: { key: string; value: string }[] };
+        scheduling: { preemptible: boolean; onHostMaintenance?: string };
+        serviceAccounts: { email: string; scopes: string[] }[];
+        guestAccelerators?: {
+          acceleratorType: string;
+          acceleratorCount: number;
+        }[];
+      } = {
         name: vmName,
         machineType: machineType,
         tags: {
-          items: ["http-server", "https-server"],
+          items: [
+            "http-server",
+            "https-server",
+            `team-${input.teamId.replace(/[^a-z0-9\-_]/gi, "-").toLowerCase()}`,
+          ],
         },
         // Add labels for organization and user tracking
         labels: {
@@ -69,6 +104,7 @@ export const createVm = protectedProcedure
           user_id: userId.replace(/[^a-z0-9\-_]/gi, "-").toLowerCase(),
           created_by: "supastarter",
           model_name: input.modelName.toLowerCase().replace(/\s/g, "-"),
+          team_id: input.teamId.replace(/[^a-z0-9\-_]/gi, "-").toLowerCase(),
         },
         disks: [
           {

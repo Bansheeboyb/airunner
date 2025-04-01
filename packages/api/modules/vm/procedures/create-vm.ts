@@ -2,7 +2,7 @@ import { z } from "zod";
 import { protectedProcedure } from "../../trpc";
 import { google } from "googleapis";
 import { createHash } from "crypto";
-import { OAuth2Client } from "google-auth-library";
+import { JWT } from "google-auth-library";
 
 export const createVm = protectedProcedure
   .input(
@@ -58,19 +58,17 @@ export const createVm = protectedProcedure
         throw new Error("Invalid or missing GCP credentials");
       }
 
-      // Use the credentials directly with OAuth2Client
-      const authClient = new OAuth2Client();
-      authClient.fromJSON({
-        type: "service_account",
-        project_id: process.env.GCP_PROJECT_ID,
-        private_key: privateKey,
-        client_email: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+      // Create JWT client with service account credentials
+      const client = new JWT({
+        email: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+        key: privateKey,
+        scopes: ["https://www.googleapis.com/auth/cloud-platform"],
       });
 
-      // Create Compute Engine client with our auth client
+      // Create Compute Engine client with our JWT client
       const compute = google.compute({
         version: "v1",
-        auth: authClient,
+        auth: client,
       });
 
       // Log successful auth setup
@@ -91,7 +89,36 @@ export const createVm = protectedProcedure
       }-${input.memoryGB * 1024}`;
 
       // Define VM creation parameters
-      const vmConfig = {
+      const vmConfig: {
+        name: string;
+        machineType: string;
+        tags: { items: string[] };
+        labels: { [key: string]: string };
+        disks: {
+          boot: boolean;
+          autoDelete: boolean;
+          initializeParams: { sourceImage: string; diskSizeGb: string };
+        }[];
+        networkInterfaces: {
+          network: string;
+          accessConfigs: { type: string; name: string }[];
+        }[];
+        metadata: {
+          items: { key: string; value: string }[];
+        };
+        scheduling: {
+          preemptible: boolean;
+          onHostMaintenance?: string;
+        };
+        serviceAccounts: {
+          email: string;
+          scopes: string[];
+        }[];
+        guestAccelerators?: {
+          acceleratorType: string;
+          acceleratorCount: number;
+        }[];
+      } = {
         name: vmName,
         machineType: machineType,
         tags: {

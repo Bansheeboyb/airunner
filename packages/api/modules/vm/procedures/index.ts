@@ -1,3 +1,3 @@
-export * from "./create-vm";
-export * from "./check-vm-status";
-export * from "./list-user-vms";
+export { createVm } from "./create-vm";
+export { checkVmStatus } from "./check-vm-status";
+export { listUserVms } from "./list-user-vms";

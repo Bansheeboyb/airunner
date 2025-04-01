@@ -39,7 +39,7 @@
 
     <Card class="mt-8">
       <div
-        class="flex h-64 items-center justify-center p-8 text-muted-foreground"
+        class="flex h-full items-center justify-center p-8 text-muted-foreground"
       >
         <SaasDeployedServerList />
       </div>

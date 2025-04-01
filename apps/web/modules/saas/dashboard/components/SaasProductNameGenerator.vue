@@ -55,6 +55,7 @@
     description: string;
     tags: string[];
     updated: string;
+    imageUrl?: string;
   }
 
   // Sample model data
@@ -65,6 +66,8 @@
       model: "phi-4-mini-instruct",
       company: "Microsoft",
       category: "Text Generation",
+      imageUrl:
+        "https://pub-e93d5c9fdf134c89830082377f6df465.r2.dev/2024/12/Phi-4-Microsofts-Small-AI-Model-Beats-the-Giants-at-Math.webp",
       description:
         "Advanced language model with improved reasoning and context window. Capable of complex reasoning and creative text generation.",
       tags: ["Language Model", "ChatBot", "API Available"],
@@ -76,6 +79,8 @@
       model: "claude-3.7-sonnet",
       company: "Anthropic",
       category: "Text Generation",
+      imageUrl:
+        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRb_buBcn9wPL3l7UX1aoknZFgDX-RyoUf7YQ&s",
       description:
         "Advanced reasoning model with extended thinking capability for complex problem solving and detailed responses.",
       tags: ["Language Model", "Reasoning", "Enterprise"],
@@ -142,6 +147,8 @@
       model: "llama-3",
       company: "Meta",
       category: "Text Generation",
+      imageUrl:
+        "https://calaltrading.ae/grid/99/110/ERA_CMS_IMG_22_1727332957.webp",
       description:
         "Open-source large language model with powerful capabilities for a wide range of applications.",
       tags: ["Open Source", "Multilingual", "Fine-tunable"],
@@ -511,8 +518,18 @@
         <div
           v-for="model in modelGroup"
           :key="model.id"
-          class="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 transition-all duration-300 hover:shadow-lg hover:shadow-crypto-blue-500"
+          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50"
         >
+          <div class="relative h-48 overflow-hidden">
+            <img
+              :src="model.imageUrl"
+              :alt="model.name"
+              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <div
+              class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"
+            ></div>
+          </div>
           <div class="p-6">
             <div class="flex items-center justify-between mb-4">
               <div class="flex items-center">

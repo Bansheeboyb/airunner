@@ -381,13 +381,6 @@
               >
                 {{ vm.status }}
               </span>
-              <span
-                v-for="(tag, index) in vm.modelDetails?.tags"
-                :key="index"
-                class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded"
-              >
-                {{ tag }}
-              </span>
             </div>
 
             <div class="flex items-center justify-between text-sm">

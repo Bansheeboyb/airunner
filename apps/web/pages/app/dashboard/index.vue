@@ -41,7 +41,7 @@
       <div
         class="flex h-64 items-center justify-center p-8 text-muted-foreground"
       >
-        Place your content here...
+        <SaasDeployedServerList />
       </div>
     </Card>
   </div>

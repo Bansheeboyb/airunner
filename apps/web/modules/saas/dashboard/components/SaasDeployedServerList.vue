@@ -285,21 +285,22 @@
     </ul>
 
     <!-- Deployed Models Grid -->
-    <div
-      v-for="(vms, status) in filteredByStatus"
-      :key="status"
-      class="mb-12 mt-8"
-    >
-      <h3 class="text-xl font-semibold mb-4">{{ status }}</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div v-for="(vms, status) in filteredByStatus" :key="status" class="mb-12">
+      <!-- Section Header with clearer visual separation -->
+      <h3 class="text-2xl font-bold mb-6 pb-2 border-b-2 border-gray-200">
+        {{ status }}
+      </h3>
+
+      <!-- Responsive Grid with better spacing -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <!-- Card with improved visual hierarchy -->
         <div
           v-for="vm in vms"
           :key="vm.id"
-          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50"
+          class="bg-[#1b2931] rounded-xl overflow-hidden border border-[#ADBFD1] transition-all duration-300 hover:shadow-lg hover:scale-[1.02] group flex flex-col"
         >
-          <div
-            class="relative h-48 overflow-hidden flex items-center justify-center"
-          >
+          <!-- Card Header with Image -->
+          <div class="relative h-40 overflow-hidden">
             <img
               v-if="vm.modelDetails?.imageUrl"
               :src="vm.modelDetails.imageUrl"
@@ -311,76 +312,81 @@
               class="w-full h-full flex items-center justify-center bg-gradient-to-br"
               :class="getGradientClass(vm.modelDetails?.category || 'AI Model')"
             >
-              <ServerIcon class="h-16 w-16 text-white opacity-40" />
+              <ServerIcon class="h-12 w-12 text-white opacity-50" />
             </div>
-            <div
-              class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"
-            ></div>
+
+            <!-- Category Tag - Moved to top right for better visibility -->
+            <span
+              class="absolute top-2 right-2 text-xs font-medium px-3 py-1 rounded-full shadow-sm"
+              :class="getTagClass(vm.modelDetails?.category || 'AI Model')"
+            >
+              {{ vm.modelDetails?.category || "AI Model" }}
+            </span>
           </div>
-          <div class="p-6">
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center">
+
+          <!-- Card Content with better spacing and organization -->
+          <div class="p-5 flex-grow flex flex-col">
+            <!-- Model Info Section -->
+            <div class="mb-4">
+              <!-- Company and Model Identifier -->
+              <div class="flex items-center mb-2">
                 <div
-                  class="flex-shrink-0 w-10 h-10 rounded-full mr-3 bg-gradient-to-br"
+                  class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gradient-to-br flex items-center justify-center"
                   :class="
                     getGradientClass(vm.modelDetails?.category || 'AI Model')
                   "
                 >
-                  <div
-                    class="w-full h-full flex items-center justify-center text-white"
-                  >
-                    <MessageSquareIcon
-                      v-if="vm.modelDetails?.category === 'Text Generation'"
-                      class="size-5"
-                    />
-                    <ImageIcon
-                      v-else-if="
-                        vm.modelDetails?.category === 'Image Generation'
-                      "
-                      class="size-5"
-                    />
-                    <HeadphonesIcon
-                      v-else-if="
-                        vm.modelDetails?.category === 'Audio Transcription' ||
-                        vm.modelDetails?.category === 'Audio Generation'
-                      "
-                      class="size-5"
-                    />
-                    <VideoIcon
-                      v-else-if="
-                        vm.modelDetails?.category === 'Video Generation'
-                      "
-                      class="size-5"
-                    />
-                    <ServerIcon v-else class="size-5" />
-                  </div>
+                  <MessageSquareIcon
+                    v-if="vm.modelDetails?.category === 'Text Generation'"
+                    class="size-4 text-white"
+                  />
+                  <ImageIcon
+                    v-else-if="vm.modelDetails?.category === 'Image Generation'"
+                    class="size-4 text-white"
+                  />
+                  <HeadphonesIcon
+                    v-else-if="
+                      vm.modelDetails?.category === 'Audio Transcription' ||
+                      vm.modelDetails?.category === 'Audio Generation'
+                    "
+                    class="size-4 text-white"
+                  />
+                  <VideoIcon
+                    v-else-if="vm.modelDetails?.category === 'Video Generation'"
+                    class="size-4 text-white"
+                  />
+                  <ServerIcon v-else class="size-4 text-white" />
                 </div>
+                <span class="font-medium text-gray-300">{{
+                  vm.modelDetails?.company || "Custom"
+                }}</span>
               </div>
-              <span
-                class="text-xs font-medium px-2.5 py-0.5 rounded-full"
-                :class="getTagClass(vm.modelDetails?.category || 'AI Model')"
-              >
-                {{ vm.modelDetails?.category || "AI Model" }}
-              </span>
+
+              <!-- Model Name with better typography -->
+              <p class="text-gray-400 text-sm mb-2 font-medium">
+                {{ vm.labels?.model_name || "Custom Model" }}
+              </p>
             </div>
 
-            <p class="text-gray-600 text-sm mb-4 line-clamp-2">
-              Model: {{ vm.labels?.model_name || "Custom Model" }}
-            </p>
-            <div class="flex items-center text-sm text-gray-500">
-              <span>{{ vm.modelDetails?.company || "Custom" }}</span>
-            </div>
-            <div class="flex flex-wrap gap-2 mb-4">
+            <!-- Status Badge - More prominent -->
+            <div class="mb-4">
               <span
-                class="text-xs px-2 py-1 rounded"
+                class="inline-block text-xs px-3 py-1 rounded-md font-medium"
                 :class="getStatusClass(vm.status)"
               >
                 {{ vm.status }}
               </span>
             </div>
 
-            <div class="flex items-center justify-between text-sm">
-              <div class="flex items-center text-gray-600">
+            <!-- Spacer to push footer to bottom -->
+            <div class="flex-grow"></div>
+
+            <!-- Card Footer with clearer separation -->
+            <div
+              class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
+            >
+              <!-- Creation Date -->
+              <div class="flex items-center text-gray-400">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 mr-1"
@@ -395,24 +401,24 @@
                     d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                   />
                 </svg>
+                <span>{{ formatDate(vm.creationTimestamp) }}</span>
               </div>
-              <span>{{ formatDate(vm.creationTimestamp) }}</span>
-              <div class="flex gap-2">
-                <button
-                  v-if="vm.status === 'RUNNING'"
-                  @click="viewApiEndpoint(vm)"
-                  class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-md text-xs font-medium"
-                >
-                  View API Endpoint
-                </button>
-                <button
-                  v-else
-                  class="bg-gray-500 text-white px-3 py-1 rounded-md text-xs font-medium cursor-not-allowed"
-                  disabled
-                >
-                  Not Available
-                </button>
-              </div>
+
+              <!-- Action Button - More prominent -->
+              <button
+                v-if="vm.status === 'RUNNING'"
+                @click="viewApiEndpoint(vm)"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200"
+              >
+                View API
+              </button>
+              <button
+                v-else
+                class="bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium cursor-not-allowed opacity-50"
+                disabled
+              >
+                Not Available
+              </button>
             </div>
           </div>
         </div>

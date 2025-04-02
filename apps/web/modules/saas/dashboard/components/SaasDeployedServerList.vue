@@ -355,9 +355,6 @@
                     <ServerIcon v-else class="size-5" />
                   </div>
                 </div>
-                <div>
-                  <h3 class="font-semibold text-lg">{{ vm.name }}</h3>
-                </div>
               </div>
               <span
                 class="text-xs font-medium px-2.5 py-0.5 rounded-full"

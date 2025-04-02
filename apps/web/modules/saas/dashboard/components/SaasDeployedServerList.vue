@@ -285,19 +285,17 @@
     </ul>
 
     <!-- Deployed Models Grid -->
-    <div v-for="(vms, status) in filteredByStatus" :key="status" class="mb-12">
-      <!-- Section Header with clearer visual separation -->
-      <h3 class="text-2xl font-bold mb-6 pb-2 border-b-2 border-gray-200">
-        {{ status }}
-      </h3>
-
-      <!-- Responsive Grid with better spacing -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        <!-- Card with improved visual hierarchy -->
+    <div
+      v-for="(vms, status) in filteredByStatus"
+      :key="status"
+      class="mb-12 mt-8"
+    >
+      <h3 class="text-xl font-semibold mb-4">{{ status }}</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div
           v-for="vm in vms"
           :key="vm.id"
-          class="bg-[#1b2931] rounded-xl overflow-hidden border border-[#ADBFD1] transition-all duration-300 hover:shadow-lg hover:scale-[1.02] group flex flex-col"
+          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50"
         >
           <!-- Card Header with Image -->
           <div class="relative h-40 overflow-hidden">

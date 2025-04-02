@@ -325,55 +325,61 @@
           <!-- Card Content with better spacing and organization -->
           <div class="p-5 flex-grow flex flex-col">
             <!-- Model Info Section -->
-            <div class="mb-4">
-              <!-- Company and Model Identifier -->
-              <div class="flex items-center mb-2">
-                <div
-                  class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gradient-to-br flex items-center justify-center"
-                  :class="
-                    getGradientClass(vm.modelDetails?.category || 'AI Model')
-                  "
-                >
-                  <MessageSquareIcon
-                    v-if="vm.modelDetails?.category === 'Text Generation'"
-                    class="size-4 text-white"
-                  />
-                  <ImageIcon
-                    v-else-if="vm.modelDetails?.category === 'Image Generation'"
-                    class="size-4 text-white"
-                  />
-                  <HeadphonesIcon
-                    v-else-if="
-                      vm.modelDetails?.category === 'Audio Transcription' ||
-                      vm.modelDetails?.category === 'Audio Generation'
+            <div class="mb-4 flex justify-between items-start">
+              <div>
+                <!-- Company and Model Identifier -->
+                <div class="flex items-center mb-2">
+                  <div
+                    class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gradient-to-br flex items-center justify-center"
+                    :class="
+                      getGradientClass(vm.modelDetails?.category || 'AI Model')
                     "
-                    class="size-4 text-white"
-                  />
-                  <VideoIcon
-                    v-else-if="vm.modelDetails?.category === 'Video Generation'"
-                    class="size-4 text-white"
-                  />
-                  <ServerIcon v-else class="size-4 text-white" />
+                  >
+                    <MessageSquareIcon
+                      v-if="vm.modelDetails?.category === 'Text Generation'"
+                      class="size-4 text-white"
+                    />
+                    <ImageIcon
+                      v-else-if="
+                        vm.modelDetails?.category === 'Image Generation'
+                      "
+                      class="size-4 text-white"
+                    />
+                    <HeadphonesIcon
+                      v-else-if="
+                        vm.modelDetails?.category === 'Audio Transcription' ||
+                        vm.modelDetails?.category === 'Audio Generation'
+                      "
+                      class="size-4 text-white"
+                    />
+                    <VideoIcon
+                      v-else-if="
+                        vm.modelDetails?.category === 'Video Generation'
+                      "
+                      class="size-4 text-white"
+                    />
+                    <ServerIcon v-else class="size-4 text-white" />
+                  </div>
+                  <span class="font-medium text-gray-300">{{
+                    vm.labels?.model_name || "Custom Model"
+                  }}</span>
                 </div>
-                <span class="font-medium text-gray-300">{{
-                  vm.modelDetails?.company || "Custom"
-                }}</span>
+
+                <!-- Model Name with better typography -->
+                <p class="text-gray-400 text-sm mb-2 font-medium">
+                  {{ vm.modelDetails?.company || "Custom" }}
+                </p>
               </div>
 
-              <!-- Model Name with better typography -->
-              <p class="text-gray-400 text-sm mb-2 font-medium">
-                {{ vm.labels?.model_name || "Custom Model" }}
-              </p>
-            </div>
-
-            <!-- Status Badge - More prominent -->
-            <div class="mb-4">
-              <span
-                class="inline-block text-xs px-3 py-1 rounded-md font-medium"
-                :class="getStatusClass(vm.status)"
-              >
-                {{ vm.status }}
-              </span>
+              <!-- Status Badge - Moved to right side -->
+              <div>
+                <span
+                  class="inline-block text-xs px-3 py-1 rounded-md font-medium"
+                  :class="getStatusClass(vm.status)"
+                >
+                  {{ vm.status }}
+                </span>
+              </div>
             </div>
 
             <!-- Spacer to push footer to bottom -->

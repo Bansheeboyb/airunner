@@ -520,67 +520,68 @@
           :key="model.id"
           class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50"
         >
-          <div class="relative h-48 overflow-hidden">
+          <!-- Card Header with Image -->
+          <div class="relative h-40 overflow-hidden">
             <img
               :src="model.imageUrl"
               :alt="model.name"
               class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
             />
-            <div
-              class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent"
-            ></div>
+            <!-- Category Tag - Moved to top right for better visibility -->
+            <span
+              class="absolute top-2 right-2 text-xs font-medium px-3 py-1 rounded-full shadow-sm"
+              :class="getTagClass(model.category)"
+            >
+              {{ model.category }}
+            </span>
           </div>
-          <div class="p-6">
-            <div class="flex items-center justify-between mb-4">
-              <div class="flex items-center">
+
+          <!-- Card Content with better spacing and organization -->
+          <div class="p-5 flex-grow flex flex-col">
+            <!-- Model Info Section -->
+            <div class="mb-4">
+              <!-- Company and Model Identifier -->
+              <div class="flex items-center mb-2">
                 <div
-                  class="flex-shrink-0 w-10 h-10 rounded-full mr-3 bg-gradient-to-br"
+                  class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gradient-to-br flex items-center justify-center"
                   :class="getGradientClass(model.category)"
                 >
-                  <div
-                    class="w-full h-full flex items-center justify-center text-white"
-                  >
-                    <MessageSquareIcon
-                      v-if="model.category === 'Text Generation'"
-                      class="size-5"
-                    />
-                    <ImageIcon
-                      v-else-if="model.category === 'Image Generation'"
-                      class="size-5"
-                    />
-                    <HeadphonesIcon
-                      v-else-if="
-                        model.category === 'Audio Transcription' ||
-                        model.category === 'Audio Generation'
-                      "
-                      class="size-5"
-                    />
-                    <VideoIcon
-                      v-else-if="model.category === 'Video Generation'"
-                      class="size-5"
-                    />
-                    <Wand2Icon v-else class="size-5" />
-                  </div>
+                  <MessageSquareIcon
+                    v-if="model.category === 'Text Generation'"
+                    class="size-4 text-white"
+                  />
+                  <ImageIcon
+                    v-else-if="model.category === 'Image Generation'"
+                    class="size-4 text-white"
+                  />
+                  <HeadphonesIcon
+                    v-else-if="
+                      model.category === 'Audio Transcription' ||
+                      model.category === 'Audio Generation'
+                    "
+                    class="size-4 text-white"
+                  />
+                  <VideoIcon
+                    v-else-if="model.category === 'Video Generation'"
+                    class="size-4 text-white"
+                  />
+                  <Wand2Icon v-else class="size-4 text-white" />
                 </div>
-                <div>
-                  <h3 class="font-semibold text-lg">{{ model.name }}</h3>
-                  <div class="flex items-center text-sm text-gray-500">
-                    <span>{{ model.company }}</span>
-                  </div>
-                </div>
+                <span class="font-medium text-gray-300">{{ model.name }}</span>
               </div>
-              <span
-                class="text-xs font-medium px-2.5 py-0.5 rounded-full"
-                :class="getTagClass(model.category)"
-              >
-                {{ model.category }}
-              </span>
+
+              <!-- Company name with better typography -->
+              <p class="text-gray-400 text-sm mb-2 font-medium">
+                {{ model.company }}
+              </p>
             </div>
 
+            <!-- Model description - Limited to 2 lines -->
             <p class="text-gray-600 text-sm mb-4 line-clamp-2">
               {{ model.description }}
             </p>
 
+            <!-- Tags section -->
             <div class="flex flex-wrap gap-2 mb-4">
               <span
                 v-for="(tag, index) in model.tags"
@@ -591,8 +592,15 @@
               </span>
             </div>
 
-            <div class="flex items-center justify-between text-sm">
-              <div class="flex items-center text-gray-600">
+            <!-- Spacer to push footer to bottom -->
+            <div class="flex-grow"></div>
+
+            <!-- Card Footer with clearer separation -->
+            <div
+              class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
+            >
+              <!-- Updated Date -->
+              <div class="flex items-center text-gray-400">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   class="h-4 w-4 mr-1"
@@ -609,17 +617,19 @@
                 </svg>
                 <span>{{ model.updated }}</span>
               </div>
+
+              <!-- Action Buttons - More prominent -->
               <div class="flex gap-2">
                 <button
-                  class="text-indigo-600 hover:text-indigo-800 font-medium"
+                  class="text-indigo-600 hover:text-indigo-700 font-medium text-xs"
                 >
                   View Details
                 </button>
                 <button
                   @click="openDeploymentForm(model)"
-                  class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1 rounded-md text-xs font-medium"
+                  class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200"
                 >
-                  Deploy Model
+                  Deploy
                 </button>
               </div>
             </div>

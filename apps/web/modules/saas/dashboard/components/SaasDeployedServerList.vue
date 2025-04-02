@@ -357,9 +357,6 @@
                 </div>
                 <div>
                   <h3 class="font-semibold text-lg">{{ vm.name }}</h3>
-                  <div class="flex items-center text-sm text-gray-500">
-                    <span>{{ vm.modelDetails?.company || "Custom" }}</span>
-                  </div>
                 </div>
               </div>
               <span
@@ -373,7 +370,9 @@
             <p class="text-gray-600 text-sm mb-4 line-clamp-2">
               Model: {{ vm.labels?.model_name || "Custom Model" }}
             </p>
-
+            <div class="flex items-center text-sm text-gray-500">
+              <span>{{ vm.modelDetails?.company || "Custom" }}</span>
+            </div>
             <div class="flex flex-wrap gap-2 mb-4">
               <span
                 class="text-xs px-2 py-1 rounded"
@@ -399,8 +398,8 @@
                     d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                   />
                 </svg>
-                <span>{{ formatDate(vm.creationTimestamp) }}</span>
               </div>
+              <span>{{ formatDate(vm.creationTimestamp) }}</span>
               <div class="flex gap-2">
                 <button
                   v-if="vm.status === 'RUNNING'"

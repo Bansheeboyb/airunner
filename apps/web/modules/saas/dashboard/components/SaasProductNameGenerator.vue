@@ -9,55 +9,6 @@
   import { z } from "zod";
   import { computed, ref } from "vue";
 
-  const { currentTeam } = useUser();
-
-  const { apiCaller } = useApiCaller();
-
-  const formSchema = toTypedSchema(
-    z.object({
-      topic: z.string().min(1),
-    }),
-  );
-
-  const { handleSubmit, values } = useForm({
-    validationSchema: formSchema,
-    initialValues: {
-      topic: "",
-    },
-  });
-
-  const topicValue = computed(() => {
-    return values.topic || "";
-  });
-
-  const { data, pending, refresh, status } = useAsyncData(
-    () => {
-      return apiCaller.ai.generateProductNames.query({
-        topic: topicValue.value,
-      });
-    },
-    {
-      immediate: false,
-    },
-  );
-
-  const onSubmit = handleSubmit(async () => {
-    refresh();
-  });
-
-  // Define model interface
-  interface Model {
-    id: number;
-    name: string;
-    model: string;
-    company: string;
-    category: string;
-    description: string;
-    tags: string[];
-    updated: string;
-    imageUrl?: string;
-  }
-
   // Sample model data
   // const models = ref<Model[]>([
   //   {
@@ -199,6 +150,55 @@
   //     updated: "December 2024",
   //   },
   // ]);
+
+  const { currentTeam } = useUser();
+
+  const { apiCaller } = useApiCaller();
+
+  const formSchema = toTypedSchema(
+    z.object({
+      topic: z.string().min(1),
+    }),
+  );
+
+  const { handleSubmit, values } = useForm({
+    validationSchema: formSchema,
+    initialValues: {
+      topic: "",
+    },
+  });
+
+  const topicValue = computed(() => {
+    return values.topic || "";
+  });
+
+  const { data, pending, refresh, status } = useAsyncData(
+    () => {
+      return apiCaller.ai.generateProductNames.query({
+        topic: topicValue.value,
+      });
+    },
+    {
+      immediate: false,
+    },
+  );
+
+  const onSubmit = handleSubmit(async () => {
+    refresh();
+  });
+
+  // Define model interface
+  interface Model {
+    id: number;
+    name: string;
+    model: string;
+    company: string;
+    category: string;
+    description: string;
+    tags: string[];
+    updated: string;
+    imageUrl?: string;
+  }
 
   const models = ref<Model[]>([]);
   const isLoading = ref(true);
@@ -503,8 +503,22 @@
         </div>
       </div>
 
-      <!-- Category Navigation -->
+      <!-- Skeleton Category Navigation -->
       <ul
+        v-if="isLoading"
+        class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm"
+      >
+        <li>
+          <div class="h-8 bg-gray-300 rounded w-24 animate-pulse"></div>
+        </li>
+        <li v-for="i in 4" :key="i">
+          <div class="h-8 bg-gray-300 rounded w-28 animate-pulse"></div>
+        </li>
+      </ul>
+
+      <!-- Actual Category Navigation -->
+      <ul
+        v-else
         class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm"
       >
         <li>
@@ -536,8 +550,94 @@
       </ul>
     </div>
 
+    <!-- Skeleton Loader -->
+    <div v-if="isLoading" class="mb-12 mt-12">
+      <div class="h-8 w-48 bg-gray-300 rounded mb-6 animate-pulse"></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div
+          v-for="i in 6"
+          :key="i"
+          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden animate-pulse"
+        >
+          <!-- Skeleton Header -->
+          <div class="relative h-40 bg-gray-700"></div>
+
+          <!-- Skeleton Content -->
+          <div class="p-5 flex-grow flex flex-col">
+            <!-- Skeleton Model Info -->
+            <div class="mb-4">
+              <div class="flex items-center mb-2">
+                <div
+                  class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gray-700"
+                ></div>
+                <div class="h-5 bg-gray-700 rounded w-32"></div>
+              </div>
+              <div class="h-4 bg-gray-700 rounded w-24 mb-2"></div>
+            </div>
+
+            <!-- Skeleton Description -->
+            <div class="h-4 bg-gray-700 rounded w-full mb-2"></div>
+            <div class="h-4 bg-gray-700 rounded w-5/6 mb-4"></div>
+
+            <!-- Skeleton Tags -->
+            <div class="flex flex-wrap gap-2 mb-4">
+              <div class="h-6 bg-gray-700 rounded w-16"></div>
+              <div class="h-6 bg-gray-700 rounded w-20"></div>
+              <div class="h-6 bg-gray-700 rounded w-24"></div>
+            </div>
+
+            <!-- Spacer -->
+            <div class="flex-grow"></div>
+
+            <!-- Skeleton Footer -->
+            <div
+              class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
+            >
+              <div class="h-4 bg-gray-700 rounded w-20"></div>
+              <div class="flex gap-2">
+                <div class="h-6 bg-gray-700 rounded w-16"></div>
+                <div class="h-6 bg-gray-700 rounded w-16"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error State -->
+    <div
+      v-else-if="fetchError"
+      class="bg-red-50 rounded-lg p-8 text-center mb-12 mt-12"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="h-12 w-12 mx-auto text-red-400 mb-4"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+        />
+      </svg>
+      <h3 class="text-lg font-medium text-red-900 mb-2">
+        Failed to load models
+      </h3>
+      <p class="text-red-600">{{ fetchError }}</p>
+      <button
+        @click="loadModels()"
+        class="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+      >
+        Try Again
+      </button>
+    </div>
+
     <!-- Models Grid -->
     <div
+      v-else
       v-for="(modelGroup, category) in filteredModelsByCategory"
       :key="category"
       class="mb-12 mt-12"
@@ -667,10 +767,14 @@
       </div>
     </div>
 
-    <!-- Empty State -->
+    <!-- Empty State (when not loading and no results) -->
     <div
-      v-if="Object.keys(filteredModelsByCategory).length === 0"
-      class="bg-gray-50 rounded-lg p-8 text-center"
+      v-if="
+        !isLoading &&
+        !fetchError &&
+        Object.keys(filteredModelsByCategory).length === 0
+      "
+      class="bg-gray-50 rounded-lg p-8 text-center mb-12 mt-12"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

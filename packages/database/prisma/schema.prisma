@@ -142,3 +142,17 @@ model Subscription {
   variantId       String
   nextPaymentDate DateTime?
 }
+
+model Model {
+  id              Int      @id @default(autoincrement())
+  name            String
+  model           String   @unique
+  company         String
+  category        String
+  description     String
+  longDescription String   @db.Text
+  tags            String[] 
+  updated         String
+  apiEndpoint     String?
+  imageUrl        String?
+}

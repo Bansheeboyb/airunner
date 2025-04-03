@@ -59,146 +59,170 @@
   }
 
   // Sample model data
-  const models = ref<Model[]>([
-    {
-      id: 1,
-      name: "PHI Mini Instruct",
-      model: "phi-4-mini-instruct",
-      company: "Microsoft",
-      category: "Text Generation",
-      imageUrl:
-        "https://pub-e93d5c9fdf134c89830082377f6df465.r2.dev/2024/12/Phi-4-Microsofts-Small-AI-Model-Beats-the-Giants-at-Math.webp",
-      description:
-        "Advanced language model with improved reasoning and context window. Capable of complex reasoning and creative text generation.",
-      tags: ["Language Model", "ChatBot", "API Available"],
-      updated: "March 2025",
-    },
-    {
-      id: 2,
-      name: "Claude 3.7 Sonnet",
-      model: "claude-3.7-sonnet",
-      company: "Anthropic",
-      category: "Text Generation",
-      imageUrl:
-        "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRb_buBcn9wPL3l7UX1aoknZFgDX-RyoUf7YQ&s",
-      description:
-        "Advanced reasoning model with extended thinking capability for complex problem solving and detailed responses.",
-      tags: ["Language Model", "Reasoning", "Enterprise"],
-      updated: "February 2025",
-    },
-    {
-      id: 3,
-      name: "DALL-E 3",
-      model: "dall-e-3",
-      company: "OpenAI",
-      category: "Image Generation",
-      description:
-        "Creates photorealistic images and art from natural language descriptions with high fidelity and accuracy.",
-      tags: ["High Resolution", "Creative", "API Available"],
-      updated: "January 2025",
-    },
-    {
-      id: 4,
-      name: "Midjourney V6",
-      model: "midjourney-v6",
-      company: "Midjourney",
-      category: "Image Generation",
-      description:
-        "Advanced image generation model with improved coherence and art direction capabilities.",
-      tags: ["High Detail", "Art", "Discord"],
-      updated: "December 2024",
-    },
-    {
-      id: 5,
-      name: "Stable Diffusion XL",
-      model: "stable-diffusion-xl",
-      company: "Stability AI",
-      category: "Image Generation",
-      description:
-        "Open-source image generation model with high quality outputs and extensive customization options.",
-      tags: ["Open Source", "Customizable", "Community"],
-      updated: "November 2024",
-    },
-    {
-      id: 6,
-      name: "Whisper v3",
-      model: "whisper-v3",
-      company: "OpenAI",
-      category: "Audio Transcription",
-      description:
-        "Multilingual speech recognition system with high accuracy across dozens of languages.",
-      tags: ["Multilingual", "Real-time", "Noise Resistant"],
-      updated: "February 2025",
-    },
-    {
-      id: 7,
-      name: "Suno AI",
-      model: "suno-ai",
-      company: "Suno",
-      category: "Audio Generation",
-      description:
-        "Creates high-quality music from text prompts with vocals, instrumentation, and professional sound.",
-      tags: ["Music", "Creative", "Voice"],
-      updated: "March 2025",
-    },
-    {
-      id: 8,
-      name: "Llama 3",
-      model: "llama-3",
-      company: "Meta",
-      category: "Text Generation",
-      imageUrl:
-        "https://calaltrading.ae/grid/99/110/ERA_CMS_IMG_22_1727332957.webp",
-      description:
-        "Open-source large language model with powerful capabilities for a wide range of applications.",
-      tags: ["Open Source", "Multilingual", "Fine-tunable"],
-      updated: "January 2025",
-    },
-    {
-      id: 9,
-      name: "Pika 2.0",
-      model: "pika-2.0",
-      company: "Pika Labs",
-      category: "Video Generation",
-      description:
-        "Generates high-quality videos from text descriptions with advanced motion control and scene consistency.",
-      tags: ["High Quality", "Cinematic", "Text-to-Video"],
-      updated: "February 2025",
-    },
-    {
-      id: 10,
-      name: "Gen-2",
-      model: "gen-2",
-      company: "Runway",
-      category: "Video Generation",
-      description:
-        "Professional video generation model with advanced editing capabilities and style transfer.",
-      tags: ["Professional", "Editing", "Style Transfer"],
-      updated: "December 2024",
-    },
-    {
-      id: 11,
-      name: "Gemini Pro",
-      model: "gemini-pro",
-      company: "Google",
-      category: "Text Generation",
-      description:
-        "Multimodal model built for reasoning and understanding across text, images, audio, and more.",
-      tags: ["Multimodal", "Enterprise", "API Available"],
-      updated: "January 2025",
-    },
-    {
-      id: 12,
-      name: "Deepgram Nova",
-      model: "deepgram-nova",
-      company: "Deepgram",
-      category: "Audio Transcription",
-      description:
-        "Enterprise speech recognition with support for real-time transcription and speaker diarization.",
-      tags: ["Enterprise", "Real-time", "Speaker ID"],
-      updated: "December 2024",
-    },
-  ]);
+  // const models = ref<Model[]>([
+  //   {
+  //     id: 1,
+  //     name: "PHI Mini Instruct",
+  //     model: "phi-4-mini-instruct",
+  //     company: "Microsoft",
+  //     category: "Text Generation",
+  //     imageUrl:
+  //       "https://pub-e93d5c9fdf134c89830082377f6df465.r2.dev/2024/12/Phi-4-Microsofts-Small-AI-Model-Beats-the-Giants-at-Math.webp",
+  //     description:
+  //       "Advanced language model with improved reasoning and context window. Capable of complex reasoning and creative text generation.",
+  //     tags: ["Language Model", "ChatBot", "API Available"],
+  //     updated: "March 2025",
+  //   },
+  //   {
+  //     id: 2,
+  //     name: "Claude 3.7 Sonnet",
+  //     model: "claude-3.7-sonnet",
+  //     company: "Anthropic",
+  //     category: "Text Generation",
+  //     imageUrl:
+  //       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRb_buBcn9wPL3l7UX1aoknZFgDX-RyoUf7YQ&s",
+  //     description:
+  //       "Advanced reasoning model with extended thinking capability for complex problem solving and detailed responses.",
+  //     tags: ["Language Model", "Reasoning", "Enterprise"],
+  //     updated: "February 2025",
+  //   },
+  //   {
+  //     id: 3,
+  //     name: "DALL-E 3",
+  //     model: "dall-e-3",
+  //     company: "OpenAI",
+  //     category: "Image Generation",
+  //     description:
+  //       "Creates photorealistic images and art from natural language descriptions with high fidelity and accuracy.",
+  //     tags: ["High Resolution", "Creative", "API Available"],
+  //     updated: "January 2025",
+  //   },
+  //   {
+  //     id: 4,
+  //     name: "Midjourney V6",
+  //     model: "midjourney-v6",
+  //     company: "Midjourney",
+  //     category: "Image Generation",
+  //     description:
+  //       "Advanced image generation model with improved coherence and art direction capabilities.",
+  //     tags: ["High Detail", "Art", "Discord"],
+  //     updated: "December 2024",
+  //   },
+  //   {
+  //     id: 5,
+  //     name: "Stable Diffusion XL",
+  //     model: "stable-diffusion-xl",
+  //     company: "Stability AI",
+  //     category: "Image Generation",
+  //     description:
+  //       "Open-source image generation model with high quality outputs and extensive customization options.",
+  //     tags: ["Open Source", "Customizable", "Community"],
+  //     updated: "November 2024",
+  //   },
+  //   {
+  //     id: 6,
+  //     name: "Whisper v3",
+  //     model: "whisper-v3",
+  //     company: "OpenAI",
+  //     category: "Audio Transcription",
+  //     description:
+  //       "Multilingual speech recognition system with high accuracy across dozens of languages.",
+  //     tags: ["Multilingual", "Real-time", "Noise Resistant"],
+  //     updated: "February 2025",
+  //   },
+  //   {
+  //     id: 7,
+  //     name: "Suno AI",
+  //     model: "suno-ai",
+  //     company: "Suno",
+  //     category: "Audio Generation",
+  //     description:
+  //       "Creates high-quality music from text prompts with vocals, instrumentation, and professional sound.",
+  //     tags: ["Music", "Creative", "Voice"],
+  //     updated: "March 2025",
+  //   },
+  //   {
+  //     id: 8,
+  //     name: "Llama 3",
+  //     model: "llama-3",
+  //     company: "Meta",
+  //     category: "Text Generation",
+  //     imageUrl:
+  //       "https://calaltrading.ae/grid/99/110/ERA_CMS_IMG_22_1727332957.webp",
+  //     description:
+  //       "Open-source large language model with powerful capabilities for a wide range of applications.",
+  //     tags: ["Open Source", "Multilingual", "Fine-tunable"],
+  //     updated: "January 2025",
+  //   },
+  //   {
+  //     id: 9,
+  //     name: "Pika 2.0",
+  //     model: "pika-2.0",
+  //     company: "Pika Labs",
+  //     category: "Video Generation",
+  //     description:
+  //       "Generates high-quality videos from text descriptions with advanced motion control and scene consistency.",
+  //     tags: ["High Quality", "Cinematic", "Text-to-Video"],
+  //     updated: "February 2025",
+  //   },
+  //   {
+  //     id: 10,
+  //     name: "Gen-2",
+  //     model: "gen-2",
+  //     company: "Runway",
+  //     category: "Video Generation",
+  //     description:
+  //       "Professional video generation model with advanced editing capabilities and style transfer.",
+  //     tags: ["Professional", "Editing", "Style Transfer"],
+  //     updated: "December 2024",
+  //   },
+  //   {
+  //     id: 11,
+  //     name: "Gemini Pro",
+  //     model: "gemini-pro",
+  //     company: "Google",
+  //     category: "Text Generation",
+  //     description:
+  //       "Multimodal model built for reasoning and understanding across text, images, audio, and more.",
+  //     tags: ["Multimodal", "Enterprise", "API Available"],
+  //     updated: "January 2025",
+  //   },
+  //   {
+  //     id: 12,
+  //     name: "Deepgram Nova",
+  //     model: "deepgram-nova",
+  //     company: "Deepgram",
+  //     category: "Audio Transcription",
+  //     description:
+  //       "Enterprise speech recognition with support for real-time transcription and speaker diarization.",
+  //     tags: ["Enterprise", "Real-time", "Speaker ID"],
+  //     updated: "December 2024",
+  //   },
+  // ]);
+
+  const models = ref<Model[]>([]);
+  const isLoading = ref(true);
+  const fetchError = ref<string | null>(null);
+
+  // Function to load models
+  const loadModels = async (category = "", searchQuery = "") => {
+    try {
+      isLoading.value = true;
+      fetchError.value = null;
+
+      const result = await apiCaller.vm.listAvailableModels.query({
+        category: category || undefined,
+        searchQuery: searchQuery || undefined,
+      });
+
+      models.value = result;
+    } catch (err) {
+      console.error("Error loading models:", err);
+      fetchError.value = err instanceof Error ? err.message : String(err);
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
   // Search and filter state
   const searchQuery = ref("");
@@ -397,8 +421,13 @@
     return groupedModels;
   });
 
+  watch([searchQuery, selectedCategory], ([newSearchQuery, newCategory]) => {
+    loadModels(newCategory, newSearchQuery);
+  });
+
   // Load user's VMs on component mount
   onMounted(async () => {
+    loadModels();
     await loadUserVms();
   });
 

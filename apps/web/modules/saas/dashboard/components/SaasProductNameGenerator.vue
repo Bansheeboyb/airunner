@@ -9,148 +9,6 @@
   import { z } from "zod";
   import { computed, ref } from "vue";
 
-  // Sample model data
-  // const models = ref<Model[]>([
-  //   {
-  //     id: 1,
-  //     name: "PHI Mini Instruct",
-  //     model: "phi-4-mini-instruct",
-  //     company: "Microsoft",
-  //     category: "Text Generation",
-  //     imageUrl:
-  //       "https://pub-e93d5c9fdf134c89830082377f6df465.r2.dev/2024/12/Phi-4-Microsofts-Small-AI-Model-Beats-the-Giants-at-Math.webp",
-  //     description:
-  //       "Advanced language model with improved reasoning and context window. Capable of complex reasoning and creative text generation.",
-  //     tags: ["Language Model", "ChatBot", "API Available"],
-  //     updated: "March 2025",
-  //   },
-  //   {
-  //     id: 2,
-  //     name: "Claude 3.7 Sonnet",
-  //     model: "claude-3.7-sonnet",
-  //     company: "Anthropic",
-  //     category: "Text Generation",
-  //     imageUrl:
-  //       "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRb_buBcn9wPL3l7UX1aoknZFgDX-RyoUf7YQ&s",
-  //     description:
-  //       "Advanced reasoning model with extended thinking capability for complex problem solving and detailed responses.",
-  //     tags: ["Language Model", "Reasoning", "Enterprise"],
-  //     updated: "February 2025",
-  //   },
-  //   {
-  //     id: 3,
-  //     name: "DALL-E 3",
-  //     model: "dall-e-3",
-  //     company: "OpenAI",
-  //     category: "Image Generation",
-  //     description:
-  //       "Creates photorealistic images and art from natural language descriptions with high fidelity and accuracy.",
-  //     tags: ["High Resolution", "Creative", "API Available"],
-  //     updated: "January 2025",
-  //   },
-  //   {
-  //     id: 4,
-  //     name: "Midjourney V6",
-  //     model: "midjourney-v6",
-  //     company: "Midjourney",
-  //     category: "Image Generation",
-  //     description:
-  //       "Advanced image generation model with improved coherence and art direction capabilities.",
-  //     tags: ["High Detail", "Art", "Discord"],
-  //     updated: "December 2024",
-  //   },
-  //   {
-  //     id: 5,
-  //     name: "Stable Diffusion XL",
-  //     model: "stable-diffusion-xl",
-  //     company: "Stability AI",
-  //     category: "Image Generation",
-  //     description:
-  //       "Open-source image generation model with high quality outputs and extensive customization options.",
-  //     tags: ["Open Source", "Customizable", "Community"],
-  //     updated: "November 2024",
-  //   },
-  //   {
-  //     id: 6,
-  //     name: "Whisper v3",
-  //     model: "whisper-v3",
-  //     company: "OpenAI",
-  //     category: "Audio Transcription",
-  //     description:
-  //       "Multilingual speech recognition system with high accuracy across dozens of languages.",
-  //     tags: ["Multilingual", "Real-time", "Noise Resistant"],
-  //     updated: "February 2025",
-  //   },
-  //   {
-  //     id: 7,
-  //     name: "Suno AI",
-  //     model: "suno-ai",
-  //     company: "Suno",
-  //     category: "Audio Generation",
-  //     description:
-  //       "Creates high-quality music from text prompts with vocals, instrumentation, and professional sound.",
-  //     tags: ["Music", "Creative", "Voice"],
-  //     updated: "March 2025",
-  //   },
-  //   {
-  //     id: 8,
-  //     name: "Llama 3",
-  //     model: "llama-3",
-  //     company: "Meta",
-  //     category: "Text Generation",
-  //     imageUrl:
-  //       "https://calaltrading.ae/grid/99/110/ERA_CMS_IMG_22_1727332957.webp",
-  //     description:
-  //       "Open-source large language model with powerful capabilities for a wide range of applications.",
-  //     tags: ["Open Source", "Multilingual", "Fine-tunable"],
-  //     updated: "January 2025",
-  //   },
-  //   {
-  //     id: 9,
-  //     name: "Pika 2.0",
-  //     model: "pika-2.0",
-  //     company: "Pika Labs",
-  //     category: "Video Generation",
-  //     description:
-  //       "Generates high-quality videos from text descriptions with advanced motion control and scene consistency.",
-  //     tags: ["High Quality", "Cinematic", "Text-to-Video"],
-  //     updated: "February 2025",
-  //   },
-  //   {
-  //     id: 10,
-  //     name: "Gen-2",
-  //     model: "gen-2",
-  //     company: "Runway",
-  //     category: "Video Generation",
-  //     description:
-  //       "Professional video generation model with advanced editing capabilities and style transfer.",
-  //     tags: ["Professional", "Editing", "Style Transfer"],
-  //     updated: "December 2024",
-  //   },
-  //   {
-  //     id: 11,
-  //     name: "Gemini Pro",
-  //     model: "gemini-pro",
-  //     company: "Google",
-  //     category: "Text Generation",
-  //     description:
-  //       "Multimodal model built for reasoning and understanding across text, images, audio, and more.",
-  //     tags: ["Multimodal", "Enterprise", "API Available"],
-  //     updated: "January 2025",
-  //   },
-  //   {
-  //     id: 12,
-  //     name: "Deepgram Nova",
-  //     model: "deepgram-nova",
-  //     company: "Deepgram",
-  //     category: "Audio Transcription",
-  //     description:
-  //       "Enterprise speech recognition with support for real-time transcription and speaker diarization.",
-  //     tags: ["Enterprise", "Real-time", "Speaker ID"],
-  //     updated: "December 2024",
-  //   },
-  // ]);
-
   const { currentTeam } = useUser();
 
   const { apiCaller } = useApiCaller();
@@ -202,16 +60,24 @@
 
   const models = ref<Model[]>([]);
   const isLoading = ref(true);
+  const isInitialLoad = ref(true);
   const fetchError = ref<string | null>(null);
 
   // Function to load models
-  const loadModels = async (category = "", searchQuery = "") => {
+  const loadModels = async (categories = [], searchQuery = "") => {
     try {
-      isLoading.value = true;
+      // Only set isLoading to true on initial load
+      if (isInitialLoad.value) {
+        isLoading.value = true;
+      } else {
+        // For category/search changes, we'll keep showing the existing data
+        // while new data loads in the background
+      }
+
       fetchError.value = null;
 
       const result = await apiCaller.vm.listAvailableModels.query({
-        category: category || undefined,
+        category: "", // We're not filtering by category at the API level anymore
         searchQuery: searchQuery || undefined,
       });
 
@@ -221,12 +87,23 @@
       fetchError.value = err instanceof Error ? err.message : String(err);
     } finally {
       isLoading.value = false;
+      isInitialLoad.value = false;
     }
   };
 
   // Search and filter state
   const searchQuery = ref("");
-  const selectedCategory = ref("");
+
+  // Define fixed categories
+  const fixedCategories = [
+    "Text Generation",
+    "Image Generation",
+    "Video Generation",
+    "Audio Generation",
+  ];
+
+  // Selected categories for filtering (now an array for multiple selection)
+  const selectedCategories = ref([]);
 
   // Deployment state
   const showDeploymentForm = ref(false);
@@ -380,11 +257,15 @@
     return new Date(timestamp).toLocaleString();
   };
 
-  // Computed properties
-  const uniqueCategories = computed(() => {
-    const categories = models.value.map((model) => model.category);
-    return [...new Set(categories)];
-  });
+  // Toggle category selection
+  const toggleCategorySelection = (category) => {
+    const index = selectedCategories.value.indexOf(category);
+    if (index === -1) {
+      selectedCategories.value.push(category);
+    } else {
+      selectedCategories.value.splice(index, 1);
+    }
+  };
 
   const filteredModels = computed(() => {
     return models.value.filter((model) => {
@@ -399,9 +280,10 @@
           tag.toLowerCase().includes(searchQuery.value.toLowerCase()),
         );
 
+      // If no categories are selected or "All Models" is selected, show all models
       const matchesCategory =
-        selectedCategory.value === "" ||
-        model.category === selectedCategory.value;
+        selectedCategories.value.length === 0 ||
+        selectedCategories.value.includes(model.category);
 
       return matchesSearch && matchesCategory;
     });
@@ -411,6 +293,15 @@
     type GroupedModels = Record<string, Model[]>;
     const groupedModels: GroupedModels = {};
 
+    // Initialize with all categories that might be in filtered results
+    const categories = [
+      ...new Set(filteredModels.value.map((model) => model.category)),
+    ];
+    categories.forEach((category) => {
+      groupedModels[category] = [];
+    });
+
+    // Populate with filtered models
     filteredModels.value.forEach((model) => {
       if (!groupedModels[model.category]) {
         groupedModels[model.category] = [];
@@ -421,9 +312,12 @@
     return groupedModels;
   });
 
-  watch([searchQuery, selectedCategory], ([newSearchQuery, newCategory]) => {
-    loadModels(newCategory, newSearchQuery);
-  });
+  watch(
+    [searchQuery, selectedCategories],
+    ([newSearchQuery, newSelectedCategories]) => {
+      loadModels(newSelectedCategories, newSearchQuery);
+    },
+  );
 
   // Load user's VMs on component mount
   onMounted(async () => {
@@ -441,7 +335,6 @@
         return "from-blue-500 to-indigo-600";
       case "Image Generation":
         return "from-green-500 to-teal-600";
-      case "Audio Transcription":
       case "Audio Generation":
         return "from-amber-500 to-orange-600";
       case "Video Generation":
@@ -457,7 +350,6 @@
         return "bg-blue-100 text-blue-800";
       case "Image Generation":
         return "bg-green-100 text-green-800";
-      case "Audio Transcription":
       case "Audio Generation":
         return "bg-amber-100 text-amber-800";
       case "Video Generation":
@@ -503,9 +395,9 @@
         </div>
       </div>
 
-      <!-- Skeleton Category Navigation -->
+      <!--  Category Navigation with Checkboxes -->
       <ul
-        v-if="isLoading"
+        v-if="isInitialLoad && isLoading"
         class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm"
       >
         <li>
@@ -516,48 +408,66 @@
         </li>
       </ul>
 
-      <!-- Actual Category Navigation -->
+      <!-- Fixed Category Navigation with checkboxes -->
       <ul
         v-else
         class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm"
       >
         <li>
-          <button
-            @click="selectedCategory = ''"
-            class="flex items-center gap-2 border-b-2 px-1 pb-3 text-sm transition-colors"
-            :class="
-              selectedCategory === ''
-                ? 'border-primary font-bold text-primary'
-                : 'border-transparent'
-            "
-          >
-            <span>All Models</span>
-          </button>
+          <div class="flex items-center gap-2 px-1 pb-3 text-sm">
+            <label class="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                :checked="selectedCategories.length === 0"
+                @click="selectedCategories = []"
+                class="form-checkbox h-4 w-4 text-indigo-600"
+              />
+              <span
+                class="ml-2 transition-colors"
+                :class="
+                  selectedCategories.length === 0
+                    ? 'font-bold text-primary'
+                    : ''
+                "
+              >
+                All Models
+              </span>
+            </label>
+          </div>
         </li>
-        <li v-for="category in uniqueCategories" :key="category">
-          <button
-            @click="selectedCategory = category"
-            class="flex items-center gap-2 border-b-2 px-1 pb-3 text-sm transition-colors"
-            :class="
-              selectedCategory === category
-                ? 'border-primary font-bold text-primary'
-                : 'border-transparent'
-            "
-          >
-            <span>{{ category }}</span>
-          </button>
+        <li v-for="category in fixedCategories" :key="category">
+          <div class="flex items-center gap-2 px-1 pb-3 text-sm">
+            <label class="flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                :checked="selectedCategories.includes(category)"
+                @click="toggleCategorySelection(category)"
+                class="form-checkbox h-4 w-4 text-indigo-600"
+              />
+              <span
+                class="ml-2 transition-colors"
+                :class="
+                  selectedCategories.includes(category)
+                    ? 'font-bold text-primary'
+                    : ''
+                "
+              >
+                {{ category }}
+              </span>
+            </label>
+          </div>
         </li>
       </ul>
     </div>
 
-    <!-- Skeleton Loader -->
-    <div v-if="isLoading" class="mb-12 mt-12">
+    <!-- Skeleton Loader (only show during initial load) -->
+    <div v-if="isInitialLoad && isLoading" class="mb-12 mt-12">
       <div class="h-8 w-48 bg-gray-300 rounded mb-6 animate-pulse"></div>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div
           v-for="i in 6"
           :key="i"
-          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden animate-pulse"
+          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[#ADBFD1] animate-pulse"
         >
           <!-- Skeleton Header -->
           <div class="relative h-40 bg-gray-700"></div>
@@ -684,10 +594,7 @@
                     class="size-4 text-white"
                   />
                   <HeadphonesIcon
-                    v-else-if="
-                      model.category === 'Audio Transcription' ||
-                      model.category === 'Audio Generation'
-                    "
+                    v-else-if="model.category === 'Audio Generation'"
                     class="size-4 text-white"
                   />
                   <VideoIcon
@@ -770,6 +677,7 @@
     <!-- Empty State (when not loading and no results) -->
     <div
       v-if="
+        !isInitialLoad &&
         !isLoading &&
         !fetchError &&
         Object.keys(filteredModelsByCategory).length === 0

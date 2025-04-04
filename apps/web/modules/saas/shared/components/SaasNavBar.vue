@@ -75,7 +75,7 @@
       </div>
 
       <ul
-        class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm lg:text-base"
+        class="no-scrollbar -mx-10 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm lg:text-base"
       >
         <li v-for="menuItem of menuItems" :key="menuItem.to">
           <NuxtLinkLocale

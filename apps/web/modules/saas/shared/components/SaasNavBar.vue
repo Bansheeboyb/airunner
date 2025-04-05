@@ -57,7 +57,7 @@
   <nav class="w-full border-b">
     <div class="container max-w-6xl py-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-6">
           <NuxtLinkLocale to="/" class="block">
             <Logo />
           </NuxtLinkLocale>

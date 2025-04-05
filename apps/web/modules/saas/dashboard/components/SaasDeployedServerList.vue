@@ -7,6 +7,8 @@
     VideoIcon,
     ServerIcon,
     CloudIcon,
+    TrashIcon,
+    AlertTriangleIcon,
   } from "lucide-vue-next";
   import { ref, onMounted, computed } from "vue";
 
@@ -22,6 +24,13 @@
   const deploymentStatus = ref<string | null>(null);
   const apiEndpoint = ref<string | null>(null);
   const selectedVm = ref<Vm | null>(null);
+
+  // Delete confirmation state
+  const showDeleteConfirmation = ref(false);
+  const vmToDelete = ref<Vm | null>(null);
+  const isDeleting = ref(false);
+  const deleteError = ref<string | null>(null);
+  const deleteSuccess = ref<string | null>(null);
 
   interface Vm {
     id: string;
@@ -214,6 +223,53 @@
     apiEndpoint.value = vm.apiEndpoint ?? null;
     deploymentStatus.value = `VM '${vm.name}' is running.`;
     showDeploymentForm.value = true;
+  };
+
+  // Delete VM actions
+  const confirmDelete = (vm: Vm) => {
+    vmToDelete.value = vm;
+    showDeleteConfirmation.value = true;
+  };
+
+  const cancelDelete = () => {
+    vmToDelete.value = null;
+    showDeleteConfirmation.value = false;
+    deleteError.value = null;
+    deleteSuccess.value = null;
+  };
+
+  const executeDelete = async () => {
+    if (!vmToDelete.value) return;
+
+    try {
+      isDeleting.value = true;
+      deleteError.value = null;
+      deleteSuccess.value = null;
+
+      await apiCaller.vm.deleteVm.mutate({
+        vmName: vmToDelete.value.name,
+        zone: vmToDelete.value.zone,
+      });
+
+      deleteSuccess.value = `VM '${vmToDelete.value.name}' has been successfully deleted.`;
+
+      // Remove the VM from the list
+      userVms.value = userVms.value.filter(
+        (vm) => vm.id !== vmToDelete.value?.id,
+      );
+
+      // Close after 2 seconds
+      setTimeout(() => {
+        cancelDelete();
+      }, 2000);
+    } catch (err) {
+      console.error("Error deleting VM:", err);
+      deleteError.value = `Error deleting VM: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
+    } finally {
+      isDeleting.value = false;
+    }
   };
 
   // Copy to clipboard
@@ -494,6 +550,15 @@
                 >
                   View API
                 </button>
+                <!-- Delete button for TERMINATED VMs -->
+                <button
+                  v-else-if="vm.status === 'TERMINATED'"
+                  @click="confirmDelete(vm)"
+                  class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
+                >
+                  <TrashIcon class="h-3 w-3 mr-1" />
+                  Delete VM
+                </button>
                 <button
                   v-else
                   class="bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium cursor-not-allowed opacity-50"
@@ -618,6 +683,94 @@
             class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
           >
             Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div
+      v-if="showDeleteConfirmation"
+      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+    >
+      <div
+        class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all"
+      >
+        <div class="text-center mb-5">
+          <div
+            class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-5"
+          >
+            <AlertTriangleIcon class="h-8 w-8 text-red-600" />
+          </div>
+
+          <h3 class="text-xl font-bold text-gray-900 mb-2">
+            Confirm VM Deletion
+          </h3>
+          <p class="text-gray-600">
+            Are you sure you want to permanently delete the VM
+            <span class="font-semibold text-gray-900">{{
+              vmToDelete?.name
+            }}</span
+            >?
+          </p>
+          <p class="text-gray-600 mt-2">
+            This action cannot be undone and all associated data will be
+            permanently lost.
+          </p>
+        </div>
+
+        <!-- Status messages -->
+        <div
+          v-if="deleteError"
+          class="mb-5 p-3 bg-red-100 text-red-700 rounded-md"
+        >
+          <p>{{ deleteError }}</p>
+        </div>
+
+        <div
+          v-if="deleteSuccess"
+          class="mb-5 p-3 bg-green-100 text-green-700 rounded-md"
+        >
+          <p>{{ deleteSuccess }}</p>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="flex justify-center gap-4 mt-6">
+          <button
+            @click="cancelDelete"
+            class="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md font-medium transition-colors duration-200"
+            :disabled="isDeleting"
+          >
+            Cancel
+          </button>
+
+          <button
+            @click="executeDelete"
+            class="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium transition-colors duration-200 flex items-center justify-center"
+            :disabled="isDeleting"
+          >
+            <svg
+              v-if="isDeleting"
+              class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <span>{{ isDeleting ? "Deleting..." : "Delete VM" }}</span>
           </button>
         </div>
       </div>

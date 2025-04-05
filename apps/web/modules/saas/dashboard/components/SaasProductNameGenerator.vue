@@ -467,7 +467,7 @@
         <div
           v-for="i in 6"
           :key="i"
-          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[#ADBFD1] animate-pulse"
+          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[#3c3c3c] animate-pulse"
         >
           <!-- Skeleton Header -->
           <div class="relative h-40 bg-gray-700"></div>

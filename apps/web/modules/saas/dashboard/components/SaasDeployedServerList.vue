@@ -100,8 +100,7 @@
   };
 
   // VM status checking and polling management
-  // A simple function to poll VM status until it reaches a final state
-  // A simple function to poll VM status until it reaches a final state
+  // Modified pollVmUntilFinalState function to properly handle "success" responses
   const pollVmUntilFinalState = async (vm: Vm) => {
     try {
       console.log(`Polling VM ${vm.name}...`);
@@ -114,44 +113,44 @@
 
       console.log(`Current status for VM ${vm.name}: ${response.status}`);
 
-      // Check if we got a "success" status instead of a GCP VM status
+      // Find the VM in our list
+      const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
+      if (vmIndex === -1) return; // VM not found in our list
+
+      // Handle "success" response - never show it to the user
       if (response.status === "success") {
         console.log(
-          `Received "success" status for VM ${vm.name}, checking if we're starting or stopping`,
+          `Received "success" status for VM ${vm.name}, determining actual state based on action`,
         );
-        // Determine if we're starting or stopping based on the loading state
-        const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
-        if (vmIndex !== -1) {
-          if (isStartingVm.value[vm.id]) {
-            // We were starting, so set status to RUNNING
-            console.log(
-              `VM ${vm.name} was starting, setting status to RUNNING`,
-            );
-            userVms.value[vmIndex].status = "RUNNING";
-            isStartingVm.value[vm.id] = false;
-          } else if (isStoppingVm.value[vm.id]) {
-            // We were stopping, so set status to TERMINATED
-            console.log(
-              `VM ${vm.name} was stopping, setting status to TERMINATED`,
-            );
-            userVms.value[vmIndex].status = "TERMINATED";
-            isStoppingVm.value[vm.id] = false;
-          } else {
-            // We don't know what operation was in progress, so check again after a delay
-            console.log(
-              `VM ${vm.name} has "success" status but unknown operation, polling again...`,
-            );
-            setTimeout(() => pollVmUntilFinalState(vm), 5000);
-          }
+
+        // Determine the correct final state based on what operation we were performing
+        if (isStartingVm.value[vm.id]) {
+          // We were starting the VM, so set status to RUNNING
+          console.log(`VM ${vm.name} was starting, setting status to RUNNING`);
+          userVms.value[vmIndex].status = "RUNNING";
+          isStartingVm.value[vm.id] = false;
+        } else if (isStoppingVm.value[vm.id]) {
+          // We were stopping the VM, so set status to TERMINATED
+          console.log(
+            `VM ${vm.name} was stopping, setting status to TERMINATED`,
+          );
+          userVms.value[vmIndex].status = "TERMINATED";
+          isStoppingVm.value[vm.id] = false;
+        } else {
+          // If we're not sure what operation was in progress, make another status check
+          console.log(
+            `VM ${vm.name} has "success" status but unknown operation, checking again...`,
+          );
+
+          // Instead of showing "success" on the frontend, keep the existing status
+          // and poll again after a delay to get the real status
+          setTimeout(() => pollVmUntilFinalState(vm), 3000);
         }
         return;
       }
 
-      // Update the VM in our list with actual GCP status
-      const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
-      if (vmIndex !== -1) {
-        userVms.value[vmIndex].status = response.status;
-      }
+      // For actual GCP statuses (not "success"), update the VM status
+      userVms.value[vmIndex].status = response.status;
 
       // If we've reached a final state, clear the loading indicators
       if (response.status === "RUNNING") {
@@ -166,7 +165,7 @@
         return;
       }
 
-      // If we haven't reached a final state, check again in 5 seconds
+      // If we haven't reached a final state, check again after delay
       console.log(
         `VM ${vm.name} is still in transition. Checking again in 5 seconds...`,
       );

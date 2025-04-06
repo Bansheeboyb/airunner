@@ -419,7 +419,7 @@
   });
 
   // Load user's VMs on component mount
-  oonMounted(async () => {
+  onMounted(async () => {
     await loadUserVms();
 
     // Start polling for VMs in transitional states

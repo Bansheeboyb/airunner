@@ -41,6 +41,9 @@
   const isStoppingVm = ref<{ [key: string]: boolean }>({});
   const vmActionError = ref<{ [key: string]: string }>({});
 
+  // Polling timers
+  const pollingTimers = ref<{ [key: string]: number }>({});
+
   interface Vm {
     id: string;
     name: string;
@@ -99,6 +102,50 @@
     }
   };
 
+  // Function to check a specific VM's status
+  const checkVmStatus = async (vm: Vm) => {
+    try {
+      const response = await apiCaller.vm.checkVmStatus.query({
+        vmName: vm.name,
+        zone: vm.zone,
+      });
+
+      // Update VM status in the local state
+      const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
+      if (vmIndex !== -1) {
+        const oldStatus = userVms.value[vmIndex].status;
+        userVms.value[vmIndex].status = response.status;
+
+        // If status has changed to a stable state, clear the loading state
+        if (oldStatus !== response.status) {
+          if (response.status === "RUNNING") {
+            isStartingVm.value[vm.id] = false;
+            // Stop polling once VM is running
+            clearTimeout(pollingTimers.value[vm.id]);
+            delete pollingTimers.value[vm.id];
+          } else if (response.status === "TERMINATED") {
+            isStoppingVm.value[vm.id] = false;
+            // Stop polling once VM is terminated
+            clearTimeout(pollingTimers.value[vm.id]);
+            delete pollingTimers.value[vm.id];
+          }
+        }
+
+        // If VM is still in a transitional state, continue polling
+        if (["PROVISIONING", "STAGING", "STOPPING"].includes(response.status)) {
+          pollingTimers.value[vm.id] = setTimeout(() => {
+            checkVmStatus(vm);
+          }, 5000) as unknown as number; // Poll every 5 seconds
+        }
+      }
+    } catch (err) {
+      console.error(`Error checking status for VM ${vm.name}:`, err);
+      // Clear polling if there's an error
+      clearTimeout(pollingTimers.value[vm.id]);
+      delete pollingTimers.value[vm.id];
+    }
+  };
+
   // Start VM function
   const startVm = async (vm: Vm) => {
     try {
@@ -117,16 +164,15 @@
         userVms.value[vmIndex].status = "PROVISIONING";
       }
 
-      // After a delay, refresh the VMs to get updated statuses
-      setTimeout(() => {
-        loadUserVms();
-      }, 3000);
+      // Start polling for status updates
+      pollingTimers.value[vm.id] = setTimeout(() => {
+        checkVmStatus(vm);
+      }, 3000) as unknown as number;
     } catch (err) {
       console.error("Error starting VM:", err);
       vmActionError.value[vm.id] = `Error starting VM: ${
         err instanceof Error ? err.message : String(err)
       }`;
-    } finally {
       isStartingVm.value[vm.id] = false;
     }
   };
@@ -149,16 +195,15 @@
         userVms.value[vmIndex].status = "STOPPING";
       }
 
-      // After a delay, refresh the VMs to get updated statuses
-      setTimeout(() => {
-        loadUserVms();
-      }, 3000);
+      // Start polling for status updates
+      pollingTimers.value[vm.id] = setTimeout(() => {
+        checkVmStatus(vm);
+      }, 3000) as unknown as number;
     } catch (err) {
       console.error("Error stopping VM:", err);
       vmActionError.value[vm.id] = `Error stopping VM: ${
         err instanceof Error ? err.message : String(err)
       }`;
-    } finally {
       isStoppingVm.value[vm.id] = false;
     }
   };
@@ -377,9 +422,25 @@
     return result;
   });
 
+  // Clear all polling timers when component is unmounted
+  onUnmounted(() => {
+    Object.values(pollingTimers.value).forEach((timer) => {
+      clearTimeout(timer);
+    });
+  });
+
   // Load user's VMs on component mount
   onMounted(async () => {
     await loadUserVms();
+
+    // Start polling for VMs in transitional states
+    userVms.value.forEach((vm) => {
+      if (["PROVISIONING", "STAGING", "STOPPING"].includes(vm.status)) {
+        pollingTimers.value[vm.id] = setTimeout(() => {
+          checkVmStatus(vm);
+        }, 5000) as unknown as number;
+      }
+    });
   });
 </script>
 
@@ -490,6 +551,17 @@
           </div>
         </li>
       </ul>
+
+      <!-- Refresh Button -->
+      <div class="flex justify-end mb-6">
+        <button
+          @click="loadUserVms"
+          class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center"
+        >
+          <LoaderIcon class="h-4 w-4 mr-2" />
+          Refresh Status
+        </button>
+      </div>
 
       <!-- Deployed Models Grid -->
       <div

@@ -9,6 +9,10 @@
     CloudIcon,
     TrashIcon,
     AlertTriangleIcon,
+    PlayIcon,
+    StopCircleIcon,
+    PowerIcon,
+    LoaderIcon,
   } from "lucide-vue-next";
   import { ref, onMounted, computed } from "vue";
 
@@ -31,6 +35,11 @@
   const isDeleting = ref(false);
   const deleteError = ref<string | null>(null);
   const deleteSuccess = ref<string | null>(null);
+
+  // Start/Stop state
+  const isStartingVm = ref<{ [key: string]: boolean }>({});
+  const isStoppingVm = ref<{ [key: string]: boolean }>({});
+  const vmActionError = ref<{ [key: string]: string }>({});
 
   interface Vm {
     id: string;
@@ -87,6 +96,70 @@
       }`;
     } finally {
       isLoading.value = false;
+    }
+  };
+
+  // Start VM function
+  const startVm = async (vm: Vm) => {
+    try {
+      // Set starting state for this VM
+      isStartingVm.value[vm.id] = true;
+      vmActionError.value[vm.id] = "";
+
+      await apiCaller.vm.startVm.mutate({
+        vmName: vm.name,
+        zone: vm.zone,
+      });
+
+      // Update the VM status locally to show the transition
+      const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
+      if (vmIndex !== -1) {
+        userVms.value[vmIndex].status = "PROVISIONING";
+      }
+
+      // After a delay, refresh the VMs to get updated statuses
+      setTimeout(() => {
+        loadUserVms();
+      }, 3000);
+    } catch (err) {
+      console.error("Error starting VM:", err);
+      vmActionError.value[vm.id] = `Error starting VM: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
+    } finally {
+      isStartingVm.value[vm.id] = false;
+    }
+  };
+
+  // Stop VM function
+  const stopVm = async (vm: Vm) => {
+    try {
+      // Set stopping state for this VM
+      isStoppingVm.value[vm.id] = true;
+      vmActionError.value[vm.id] = "";
+
+      await apiCaller.vm.stopVm.mutate({
+        vmName: vm.name,
+        zone: vm.zone,
+      });
+
+      // Update the VM status locally to show the transition
+      const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
+      if (vmIndex !== -1) {
+        userVms.value[vmIndex].status = "STOPPING";
+      }
+
+      // After a delay, refresh the VMs to get updated statuses
+      setTimeout(() => {
+        loadUserVms();
+      }, 3000);
+    } catch (err) {
+      console.error("Error stopping VM:", err);
+      vmActionError.value[vm.id] = `Error stopping VM: ${
+        err instanceof Error ? err.message : String(err)
+      }`;
+    } finally {
+      isStoppingVm.value[vm.id] = false;
     }
   };
 
@@ -514,6 +587,14 @@
                 >
                   {{ vm.status }}
                 </span>
+
+                <!-- Display error messages for VM actions if any -->
+                <div
+                  v-if="vmActionError[vm.id]"
+                  class="mt-2 text-xs text-red-500"
+                >
+                  {{ vmActionError[vm.id] }}
+                </div>
               </div>
 
               <!-- Spacer to push footer to bottom -->
@@ -542,30 +623,89 @@
                   <span>{{ formatDate(vm.creationTimestamp) }}</span>
                 </div>
 
-                <!-- Action Button - More prominent -->
-                <button
-                  v-if="vm.status === 'RUNNING'"
-                  @click="viewApiEndpoint(vm)"
-                  class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200"
-                >
-                  View API
-                </button>
-                <!-- Delete button for TERMINATED VMs -->
-                <button
-                  v-else-if="vm.status === 'TERMINATED'"
-                  @click="confirmDelete(vm)"
-                  class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
-                >
-                  <TrashIcon class="h-3 w-3 mr-1" />
-                  Delete VM
-                </button>
-                <button
-                  v-else
-                  class="bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium cursor-not-allowed opacity-50"
-                  disabled
-                >
-                  Not Available
-                </button>
+                <!-- Action Buttons - Depending on VM Status -->
+                <div class="flex space-x-2">
+                  <!-- View API button for running VMs -->
+                  <button
+                    v-if="vm.status === 'RUNNING'"
+                    @click="viewApiEndpoint(vm)"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200"
+                  >
+                    View API
+                  </button>
+
+                  <!-- Stop button for running VMs -->
+                  <button
+                    v-if="vm.status === 'RUNNING'"
+                    @click="stopVm(vm)"
+                    :disabled="isStoppingVm[vm.id]"
+                    class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
+                  >
+                    <LoaderIcon
+                      v-if="isStoppingVm[vm.id]"
+                      class="h-3 w-3 mr-1 animate-spin"
+                    />
+                    <StopCircleIcon v-else class="h-3 w-3 mr-1" />
+                    Stop
+                  </button>
+
+                  <!-- Start button for terminated VMs -->
+                  <button
+                    v-if="vm.status === 'TERMINATED'"
+                    @click="startVm(vm)"
+                    :disabled="isStartingVm[vm.id]"
+                    class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
+                  >
+                    <LoaderIcon
+                      v-if="isStartingVm[vm.id]"
+                      class="h-3 w-3 mr-1 animate-spin"
+                    />
+                    <PlayIcon v-else class="h-3 w-3 mr-1" />
+                    Start
+                  </button>
+
+                  <!-- Delete button for terminated VMs -->
+                  <button
+                    v-if="vm.status === 'TERMINATED'"
+                    @click="confirmDelete(vm)"
+                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
+                  >
+                    <TrashIcon class="h-3 w-3 mr-1" />
+                    Delete
+                  </button>
+
+                  <!-- Status indicator for transitioning states -->
+                  <div
+                    v-if="
+                      ['PROVISIONING', 'STAGING', 'STOPPING'].includes(
+                        vm.status,
+                      )
+                    "
+                    class="flex items-center bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium"
+                  >
+                    <LoaderIcon class="h-3 w-3 mr-1 animate-spin" />
+                    {{
+                      vm.status === "STOPPING" ? "Stopping..." : "Starting..."
+                    }}
+                  </div>
+
+                  <!-- Not Available button for other states -->
+                  <button
+                    v-if="
+                      ![
+                        'RUNNING',
+                        'TERMINATED',
+                        'PROVISIONING',
+                        'STAGING',
+                        'STOPPING',
+                      ].includes(vm.status)
+                    "
+                    class="bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium cursor-not-allowed opacity-50"
+                    disabled
+                  >
+                    Not Available
+                  </button>
+                </div>
               </div>
             </div>
           </div>

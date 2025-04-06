@@ -41,6 +41,9 @@
   const isStoppingVm = ref<{ [key: string]: boolean }>({});
   const vmActionError = ref<{ [key: string]: string }>({});
 
+  // Polling timers
+  const pollingTimers = ref<{ [key: string]: number }>({});
+
   interface Vm {
     id: string;
     name: string;
@@ -100,75 +103,107 @@
   };
 
   // Function to check a specific VM's status
-  // A simple function to poll VM status until it reaches a final state
-  const pollVmUntilFinalState = async (vm: Vm) => {
+  const checkVmStatus = async (vm: Vm) => {
     try {
-      console.log(`Polling VM ${vm.name}...`);
-
-      // Get the current status
+      console.log(`Polling status for VM ${vm.name}...`);
       const response = await apiCaller.vm.checkVmStatus.query({
         vmName: vm.name,
         zone: vm.zone,
       });
 
-      console.log(`Current status for VM ${vm.name}: ${response.status}`);
+      console.log(`VM ${vm.name} current status:`, response.status);
 
-      // Update the VM in our list
+      // Update VM status in the local state
       const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
       if (vmIndex !== -1) {
-        userVms.value[vmIndex].status = response.status;
-      }
+        // Only update the status if it's a valid GCP status
+        if (
+          [
+            "PROVISIONING",
+            "STAGING",
+            "RUNNING",
+            "STOPPING",
+            "TERMINATED",
+            "SUSPENDED",
+            "REPAIRING",
+          ].includes(response.status)
+        ) {
+          const oldStatus = userVms.value[vmIndex].status;
+          userVms.value[vmIndex].status = response.status;
+          console.log(
+            `VM ${vm.name} status updated: ${oldStatus} -> ${response.status}`,
+          );
+        }
 
-      // If we've reached a final state, clear the loading indicators
-      if (response.status === "RUNNING") {
-        console.log(`VM ${vm.name} is now RUNNING`);
-        isStartingVm.value[vm.id] = false;
-        // Stop polling
-        return;
-      } else if (response.status === "TERMINATED") {
-        console.log(`VM ${vm.name} is now TERMINATED`);
-        isStoppingVm.value[vm.id] = false;
-        // Stop polling
-        return;
-      }
+        // Clear loading states if we've reached a terminal state
+        if (response.status === "RUNNING") {
+          isStartingVm.value[vm.id] = false;
+        } else if (response.status === "TERMINATED") {
+          isStoppingVm.value[vm.id] = false;
+        }
 
-      // If we haven't reached a final state, check again in 5 seconds
-      console.log(
-        `VM ${vm.name} is still in transition. Checking again in 5 seconds...`,
-      );
-      setTimeout(() => pollVmUntilFinalState(vm), 5000);
-    } catch (error) {
-      console.error(`Error polling VM ${vm.name}:`, error);
-      // Try again in case of error
-      setTimeout(() => pollVmUntilFinalState(vm), 5000);
+        // IMPORTANT: Always continue polling for VM status until we reach a terminal state
+        // This is the key fix to ensure we don't stop polling too early
+        if (response.status === "RUNNING" || response.status === "TERMINATED") {
+          console.log(
+            `VM ${vm.name} reached final state: ${response.status}, stopping polling`,
+          );
+          clearTimeout(pollingTimers.value[vm.id]);
+          delete pollingTimers.value[vm.id];
+        } else {
+          console.log(
+            `VM ${vm.name} still in transition (${response.status}), continuing polling...`,
+          );
+          // Continue polling until we reach a final state
+          pollingTimers.value[vm.id] = setTimeout(() => {
+            checkVmStatus(vm);
+          }, 5000) as unknown as number;
+        }
+      }
+    } catch (err) {
+      console.error(`Error checking status for VM ${vm.name}:`, err);
+      // Log error but DON'T stop polling - try again after a delay
+      console.log(`Will retry polling for VM ${vm.name} after error`);
+      pollingTimers.value[vm.id] = setTimeout(() => {
+        checkVmStatus(vm);
+      }, 8000) as unknown as number; // Longer delay after error
     }
   };
 
   // Start VM function
   const startVm = async (vm: Vm) => {
     try {
-      // Set starting state
+      // Set starting state for this VM
       isStartingVm.value[vm.id] = true;
       vmActionError.value[vm.id] = "";
 
-      // Call the API to start the VM
       await apiCaller.vm.startVm.mutate({
         vmName: vm.name,
         zone: vm.zone,
       });
 
-      // Immediately update to PROVISIONING state for instant feedback
+      console.log(`Start operation initiated for VM ${vm.name}`);
+
+      // Update the VM status locally to show the transition
       const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
       if (vmIndex !== -1) {
-        userVms.value[vmIndex].status = "PROVISIONING";
+        userVms.value[vmIndex].status = "PROVISIONING"; // Set to provisioning as a transition state
       }
 
-      // Start polling until VM is RUNNING
-      setTimeout(() => pollVmUntilFinalState(vm), 2000);
-    } catch (error) {
-      console.error(`Error starting VM ${vm.name}:`, error);
+      // Clear any existing polling timer for this VM
+      if (pollingTimers.value[vm.id]) {
+        clearTimeout(pollingTimers.value[vm.id]);
+      }
+
+      // Start polling for status updates - keep polling until we reach RUNNING
+      console.log(`Starting polling for VM ${vm.name} after start operation`);
+      pollingTimers.value[vm.id] = setTimeout(() => {
+        checkVmStatus(vm);
+      }, 2000) as unknown as number;
+    } catch (err) {
+      console.error("Error starting VM:", err);
       vmActionError.value[vm.id] = `Error starting VM: ${
-        error.message || "Unknown error"
+        err instanceof Error ? err.message : String(err)
       }`;
       isStartingVm.value[vm.id] = false;
     }
@@ -177,28 +212,76 @@
   // Stop VM function
   const stopVm = async (vm: Vm) => {
     try {
-      // Set stopping state
+      // Set stopping state for this VM
       isStoppingVm.value[vm.id] = true;
       vmActionError.value[vm.id] = "";
 
-      // Call the API to stop the VM
       await apiCaller.vm.stopVm.mutate({
         vmName: vm.name,
         zone: vm.zone,
       });
 
-      // Immediately update to STOPPING state for instant feedback
+      console.log(`Stop operation initiated for VM ${vm.name}`);
+
+      // Update the VM status locally to show the transition
       const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
       if (vmIndex !== -1) {
-        userVms.value[vmIndex].status = "STOPPING";
+        userVms.value[vmIndex].status = "STOPPING"; // Set to stopping as a transition state
       }
 
-      // Start polling until VM is TERMINATED
-      setTimeout(() => pollVmUntilFinalState(vm), 2000);
-    } catch (error) {
-      console.error(`Error stopping VM ${vm.name}:`, error);
+      // Clear any existing polling timer for this VM
+      if (pollingTimers.value[vm.id]) {
+        clearTimeout(pollingTimers.value[vm.id]);
+      }
+
+      // Start polling for status updates - keep polling until we reach TERMINATED
+      console.log(`Starting polling for VM ${vm.name} after stop operation`);
+      pollingTimers.value[vm.id] = setTimeout(() => {
+        checkVmStatus(vm);
+      }, 2000) as unknown as number;
+    } catch (err) {
+      console.error("Error stopping VM:", err);
       vmActionError.value[vm.id] = `Error stopping VM: ${
-        error.message || "Unknown error"
+        err instanceof Error ? err.message : String(err)
+      }`;
+      isStoppingVm.value[vm.id] = false;
+    }
+  };
+
+  // Stop VM function
+  const stopVm = async (vm: Vm) => {
+    try {
+      // Set stopping state for this VM
+      isStoppingVm.value[vm.id] = true;
+      vmActionError.value[vm.id] = "";
+
+      await apiCaller.vm.stopVm.mutate({
+        vmName: vm.name,
+        zone: vm.zone,
+      });
+
+      console.log(`Stop operation initiated for VM ${vm.name}`);
+
+      // Update the VM status locally to show the transition
+      const vmIndex = userVms.value.findIndex((v) => v.id === vm.id);
+      if (vmIndex !== -1) {
+        userVms.value[vmIndex].status = "STOPPING"; // Set to stopping as a transition state
+      }
+
+      // Clear any existing polling timer for this VM
+      if (pollingTimers.value[vm.id]) {
+        clearTimeout(pollingTimers.value[vm.id]);
+      }
+
+      // Start polling for status updates - keep polling until we reach TERMINATED
+      console.log(`Starting polling for VM ${vm.name} after stop operation`);
+      pollingTimers.value[vm.id] = setTimeout(() => {
+        checkVmStatus(vm);
+      }, 2000) as unknown as number;
+    } catch (err) {
+      console.error("Error stopping VM:", err);
+      vmActionError.value[vm.id] = `Error stopping VM: ${
+        err instanceof Error ? err.message : String(err)
       }`;
       isStoppingVm.value[vm.id] = false;
     }
@@ -418,6 +501,13 @@
     return result;
   });
 
+  // Clear all polling timers when component is unmounted
+  onUnmounted(() => {
+    Object.values(pollingTimers.value).forEach((timer) => {
+      clearTimeout(timer);
+    });
+  });
+
   // Load user's VMs on component mount
   onMounted(async () => {
     await loadUserVms();
@@ -425,7 +515,8 @@
     // Start polling for VMs in transitional states
     userVms.value.forEach((vm) => {
       if (["PROVISIONING", "STAGING", "STOPPING"].includes(vm.status)) {
-        pollVmUntilFinalState(vm);
+        // Start polling for VMs that are already in transition
+        setTimeout(() => checkVmStatus(vm), 1000);
       }
     });
   });

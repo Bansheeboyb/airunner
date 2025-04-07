@@ -575,7 +575,7 @@ onMounted(() => {
             </div>
             
             <div class="mt-6 flex">
-              <a
+              
                 :href="vm.apiEndpoint || `https://api.example.com/v1/models/${vm.name}`"
                 target="_blank"
                 rel="noopener noreferrer"

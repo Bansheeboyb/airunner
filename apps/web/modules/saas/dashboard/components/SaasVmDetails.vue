@@ -47,38 +47,87 @@
     { id: "performance", label: "Performance", icon: ActivityIcon },
   ];
 
+  // Extract VM name and zone from the vmId
+  const getVmNameAndZone = () => {
+    // Assuming vmId format is "vmName___zone"
+    const [vmName, zone] = props.vmId.split("___");
+    return { vmName, zone };
+  };
+
   // Load VM details
   const loadVmDetails = async () => {
     try {
       isLoading.value = true;
       error.value = null;
 
-      // This is a mock of what your API call might look like
-      // Replace with your actual API call
-      const response = await apiCaller.vm.getVmDetails.query({
-        vmId: props.vmId,
+      // Use the checkVmStatus endpoint since we don't have a getVmDetails endpoint
+      const { vmName, zone } = getVmNameAndZone();
+
+      if (!vmName || !zone) {
+        throw new Error("Invalid VM ID format");
+      }
+
+      const response = await apiCaller.vm.checkVmStatus.query({
+        vmName,
+        zone,
       });
 
-      // Enrich VM with additional details
+      // Handle if the initial status is "success"
+      let vmStatus = response.vmStatus || response.status;
+
+      // If we get a "success" status on load, treat it as an unknown state
+      // and we'll determine the actual state during polling
+      if (vmStatus === "success") {
+        console.log(
+          `Received "success" status on initial load for VM ${vmName}`,
+        );
+
+        // Use a placeholder status until we can determine the actual state
+        // This is better than showing "success" to the user
+        vmStatus = "CHECKING STATUS...";
+
+        // Start polling immediately to get the actual state
+        setTimeout(() => {
+          if (vm.value) startPolling();
+        }, 1000);
+      }
+
+      // Create a VM object from the response
       vm.value = {
-        ...response,
+        id: props.vmId,
+        name: response.name,
+        status: vmStatus,
+        zone: response.zone,
+        creationTimestamp: response.creationTimestamp,
+        apiEndpoint: response.apiEndpoint,
+        labels: response.labels || {},
+        // Additional properties with sensible defaults
+        machineType: "n1-standard-4", // Default assumption
+        memoryMb: 16384, // Default 16GB
+        diskSizeGb: 100, // Default 100GB
+        acceleratorType: "None",
+        // Add computed properties
         modelDetails: {
           category: getCategoryFromModelName(response.labels?.model_name || ""),
           company: getCompanyFromModelName(response.labels?.model_name || ""),
           description:
             "A deployed AI model instance running on your infrastructure.",
-          tags: ["Deployed", response.status, response.zone.split("-")[0]],
+          tags: ["Deployed", vmStatus, response.zone.split("-")[0]],
         },
         specs: {
-          cpu: response.machineType?.split("-").pop() || "4",
-          memory: `${response.memoryMb || 16} GB`,
-          storage: `${response.diskSizeGb || 100} GB SSD`,
-          accelerator: response.acceleratorType || "None",
+          cpu: "4", // Default assumption
+          memory: "16 GB",
+          storage: "100 GB SSD",
+          accelerator: "None",
         },
       };
 
       // Start polling if VM is in a transitional state
-      if (["PROVISIONING", "STAGING", "STOPPING"].includes(vm.value.status)) {
+      if (
+        ["PROVISIONING", "STAGING", "STOPPING", "CHECKING STATUS..."].includes(
+          vm.value.status,
+        )
+      ) {
         startPolling();
       }
     } catch (err) {
@@ -180,22 +229,71 @@
     // Poll every 5 seconds
     pollingInterval.value = window.setInterval(async () => {
       try {
-        // Replace with your actual status check API call
+        const { vmName, zone } = getVmNameAndZone();
+
+        // Get the VM status
         const response = await apiCaller.vm.checkVmStatus.query({
-          vmName: vm.value.name,
-          zone: vm.value.zone,
+          vmName,
+          zone,
         });
 
-        // Update the VM status
-        vm.value.status = response.status;
+        console.log(
+          `Polling VM ${vmName}: received status ${
+            response.vmStatus || response.status
+          }`,
+        );
 
-        // If we've reached a final state, stop polling
-        if (["RUNNING", "TERMINATED"].includes(response.status)) {
-          stopPolling();
+        // Check if we got a "success" status
+        if (response.vmStatus === "success" || response.status === "success") {
+          console.log(
+            `Received "success" status for VM ${vmName}, determining actual state based on action`,
+          );
 
-          // Clear the action flags
-          isStartingVm.value = false;
-          isStoppingVm.value = false;
+          // Determine the correct final state based on what operation we were performing
+          if (isStartingVm.value) {
+            // We were starting the VM, so set status to RUNNING
+            console.log(`VM ${vmName} was starting, setting status to RUNNING`);
+            vm.value.status = "RUNNING";
+            isStartingVm.value = false;
+
+            // Stop polling as we've reached a final state
+            stopPolling();
+          } else if (isStoppingVm.value) {
+            // We were stopping the VM, so set status to TERMINATED
+            console.log(
+              `VM ${vmName} was stopping, setting status to TERMINATED`,
+            );
+            vm.value.status = "TERMINATED";
+            isStoppingVm.value = false;
+
+            // Stop polling as we've reached a final state
+            stopPolling();
+          } else {
+            // If we're not sure what operation was in progress, make another status check after a delay
+            // This should rarely happen, but we handle it just in case
+            console.log(
+              `VM ${vmName} has "success" status but unknown operation, continuing to poll...`,
+            );
+            // Keep the current status, don't set to "success"
+          }
+        } else {
+          // For actual GCP statuses (not "success"), update the VM status
+          vm.value.status = response.vmStatus || response.status;
+
+          // Update apiEndpoint if available
+          if (response.apiEndpoint) {
+            vm.value.apiEndpoint = response.apiEndpoint;
+          }
+
+          // If we've reached a final state, stop polling
+          if (["RUNNING", "TERMINATED"].includes(vm.value.status)) {
+            console.log(`VM ${vmName} reached final state: ${vm.value.status}`);
+            stopPolling();
+
+            // Clear the action flags
+            isStartingVm.value = false;
+            isStoppingVm.value = false;
+          }
         }
       } catch (error) {
         console.error(`Error polling VM status:`, error);
@@ -217,10 +315,12 @@
       isStartingVm.value = true;
       vmActionError.value = null;
 
-      // Replace with your actual start VM API call
+      const { vmName, zone } = getVmNameAndZone();
+
+      // Call the API to start the VM
       await apiCaller.vm.startVm.mutate({
-        vmName: vm.value.name,
-        zone: vm.value.zone,
+        vmName,
+        zone,
       });
 
       // Update VM status
@@ -242,10 +342,12 @@
       isStoppingVm.value = true;
       vmActionError.value = null;
 
-      // Replace with your actual stop VM API call
+      const { vmName, zone } = getVmNameAndZone();
+
+      // Call the API to stop the VM
       await apiCaller.vm.stopVm.mutate({
-        vmName: vm.value.name,
-        zone: vm.value.zone,
+        vmName,
+        zone,
       });
 
       // Update VM status

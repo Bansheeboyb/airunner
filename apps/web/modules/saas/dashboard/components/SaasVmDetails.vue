@@ -552,7 +552,8 @@
             </div>
           </div>
 
-          
+          <!-- API Endpoint (only if VM is running) -->
+        </div>
 
         <!-- Logs Tab -->
         <div v-else-if="activeTab === 'logs'" class="space-y-6">

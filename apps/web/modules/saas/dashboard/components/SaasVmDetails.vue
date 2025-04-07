@@ -552,74 +552,7 @@
             </div>
           </div>
 
-          <!-- API Endpoint (only if VM is running) -->
-          <div
-            v-if="vm.status === 'RUNNING'"
-            class="bg-white shadow rounded-lg p-6"
-          >
-            <h2 class="text-lg font-medium mb-4">API Endpoint</h2>
-            <div class="mb-4">
-              <p class="text-sm text-gray-500 mb-2">Endpoint URL</p>
-              <div class="flex items-center">
-                <div
-                  class="bg-gray-100 p-3 rounded-md font-mono text-sm break-all flex-grow"
-                >
-                  {{
-                    vm.apiEndpoint ||
-                    `https://api.example.com/v1/models/${vm.name}`
-                  }}
-                </div>
-                <button
-                  @click="
-                    copyToClipboard(
-                      vm.apiEndpoint ||
-                        `https://api.example.com/v1/models/${vm.name}`,
-                    )
-                  "
-                  class="ml-2 p-2 text-gray-500 hover:text-indigo-600 rounded-md hover:bg-gray-100"
-                  title="Copy to clipboard"
-                >
-                  <span
-                    v-if="copySuccess"
-                    class="text-green-500 text-xs font-medium"
-                    >Copied!</span
-                  >
-                  <ClipboardCopyIcon v-else class="h-5 w-5" />
-                </button>
-              </div>
-            </div>
-
-            <div class="mt-4">
-              <h3 class="text-md font-medium mb-2">Example Usage</h3>
-              <div
-                class="bg-gray-900 text-gray-100 p-4 rounded-md font-mono text-sm overflow-x-auto"
-              >
-                <pre>
-curl -X POST \
-  {{ vm.apiEndpoint || `https://api.example.com/v1/models/${vm.name}` }} \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "prompt": "Hello, how can you help me today?",
-    "max_tokens": 100
-  }'</pre
-                >
-              </div>
-            </div>
-
-            <div class="mt-6 flex">
-              :href="vm.apiEndpoint ||
-              `https://api.example.com/v1/models/${vm.name}`" target="_blank"
-              rel="noopener noreferrer" class="inline-flex items-center px-4
-              py-2 border border-transparent text-sm font-medium rounded-md
-              shadow-sm text-white bg-indigo-600 hover:bg-indigo-700
-              focus:outline-none focus:ring-2 focus:ring-offset-2
-              focus:ring-indigo-500" >
-              <ExternalLinkIcon class="h-4 w-4 mr-1" />
-              Open API Documentation
-            </div>
-          </div>
-        </div>
+          
 
         <!-- Logs Tab -->
         <div v-else-if="activeTab === 'logs'" class="space-y-6">

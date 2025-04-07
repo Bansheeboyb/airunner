@@ -30,6 +30,7 @@
       :initialValue="currentTeam.encryptedHFApiKey"
       :teamId="currentTeam.id"
     />
+    <SaasManageApiKey :teamId="currentTeam.id" />
     <SaasDeleteTeamForm />
   </div>
 </template>

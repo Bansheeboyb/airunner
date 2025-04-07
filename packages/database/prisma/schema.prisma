@@ -90,6 +90,7 @@ model Team {
   memberships    TeamMembership[]
   subscription   Subscription?
   invitations    TeamInvitation[]
+  apiKeys        ApiKey[]
 }
 
 enum TeamMemberRole {
@@ -155,4 +156,27 @@ model Model {
   updated         String
   apiEndpoint     String?
   imageUrl        String?
+}
+
+
+enum ApiKeyType {
+  PERSONAL
+  TEAM
+}
+
+model ApiKey {
+  id          String     @id @default(cuid())
+  name        String
+  encryptedKey String
+  keyPrefix   String     // First few characters of the key for display
+  type        ApiKeyType
+  createdAt   DateTime   @default(now())
+  expiresAt   DateTime?
+  lastUsedAt  DateTime?
+  userId      String?
+  teamId      String?
+  team        Team?      @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([teamId])
 }

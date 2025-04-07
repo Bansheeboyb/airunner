@@ -700,26 +700,12 @@
 
         <!-- Logs Tab -->
         <div v-else-if="activeTab === 'logs'" class="space-y-6">
-          <div class="bg-white shadow rounded-lg p-6">
-            <div class="flex justify-between items-center mb-4">
-              <h2 class="text-lg font-medium">VM Logs</h2>
-              <button
-                class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
-                @click="loadVmDetails"
-              >
-                <RefreshCwIcon class="h-4 w-4 mr-1" />
-                Refresh Logs
-              </button>
-            </div>
-
-            <div
-              class="bg-gray-900 text-gray-300 p-4 rounded-md font-mono text-sm h-96 overflow-y-auto"
-            >
-              <p v-for="(log, index) in vmLogs" :key="index" class="my-1">
-                {{ log }}
-              </p>
-            </div>
-          </div>
+          <SaasVmLogViewer
+            :vmId="vmId"
+            :vmName="vm.name"
+            :zone="vm.zone"
+            :isVmRunning="vm.status === 'RUNNING'"
+          />
         </div>
 
         <!-- Performance Tab -->

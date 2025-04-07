@@ -457,7 +457,9 @@
 
   // View VM details
   const viewVmDetails = (vm: Vm) => {
-    selectedVmId.value = vm.id;
+    // Create a composite ID that includes both the VM name and zone
+    // This format needs to match what we expect in the details component
+    selectedVmId.value = `${vm.name}___${vm.zone}`;
     showDetails.value = true;
   };
 

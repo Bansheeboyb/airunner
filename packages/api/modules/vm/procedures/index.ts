@@ -5,3 +5,4 @@ export { listAvailableModels } from "./list-available-models";
 export { deleteVm } from "./delete-vm";
 export { startVm } from "./start-vm";
 export { stopVm } from "./stop-vm";
+export { getVmDetails } from "./get-vm-details";

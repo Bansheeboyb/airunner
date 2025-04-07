@@ -15,9 +15,9 @@
     LoaderIcon,
   } from "lucide-vue-next";
   import { ref, onMounted, computed } from "vue";
-  
+
   // Import VM details component
-  import SaasVmDetails from './SaasVmDetails.vue';
+  import SaasVmDetails from "./SaasVmDetails.vue";
 
   const { apiCaller } = useApiCaller();
   const { currentTeam } = useUser();
@@ -463,7 +463,7 @@
   // Find selected VM
   const getSelectedVm = computed(() => {
     if (!selectedVmId.value) return null;
-    return userVms.value.find(vm => vm.id === selectedVmId.value) || null;
+    return userVms.value.find((vm) => vm.id === selectedVmId.value) || null;
   });
 
   // Computed properties
@@ -495,12 +495,9 @@
 <template>
   <!-- VM Details View -->
   <div v-if="showDetailView && selectedVmId">
-    <SaasVmDetails 
-      :vmId="selectedVmId" 
-      @back="returnToListView" 
-    />
+    <SaasVmDetails :vmId="selectedVmId" @back="returnToListView" />
   </div>
-  
+
   <!-- VM List View -->
   <div v-else class="container max-w-6xl mx-auto px-4 py-2 mt-12 mb-8">
     <h2 class="text-2xl font-semibold mb-6">Your Deployed Models</h2>
@@ -731,8 +728,17 @@
               <!-- Card Footer with clearer separation -->
               <div
                 class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
-                @click.stop  <!-- Stop click propagation for footer elements -->
+                @click.stop
+                <!--
+                Stop
+                click
+                propagation
+                for
+                footer
+                elements
+                --
               >
+                >
                 <!-- Creation Date -->
                 <div class="flex items-center text-gray-400">
                   <svg
@@ -920,7 +926,26 @@
               >
                 Copy to Clipboard
               </button>
-              
+
+              :href="apiEndpoint" target="_blank" rel="noopener noreferrer"
+              class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2
+              px-4 rounded flex items-center" >
+              <span>Open API</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-4 w-4 ml-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                />
+              </svg>
+              <a
                 :href="apiEndpoint"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1076,7 +1101,7 @@
   .animate-spin-slow {
     animation: spin-slow 4s linear infinite;
   }
-  
+
   /* Shadow effect for cards */
   .shadow-neon {
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);

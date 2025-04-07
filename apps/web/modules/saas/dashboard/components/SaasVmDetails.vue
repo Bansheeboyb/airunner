@@ -12,11 +12,10 @@
     ActivityIcon,
     RefreshCwIcon,
   } from "lucide-vue-next";
-  import { ref, onMounted, computed } from "vue";
+  import { ref, onMounted, computed, onUnmounted } from "vue";
 
   const props = defineProps<{
     vmId: string;
-    onBack: () => void;
   }>();
 
   const emit = defineEmits(["back"]);
@@ -278,6 +277,11 @@
     }
   };
 
+  // Handle back button click
+  const goBack = () => {
+    emit("back");
+  };
+
   // Get VM logs (mock function - replace with actual implementation)
   const vmLogs = computed(() => {
     if (!vm.value || vm.value.status !== "RUNNING") {
@@ -316,9 +320,9 @@
   });
 
   // Clean up on component unmount
-  const onUnmounted = () => {
+  onUnmounted(() => {
     stopPolling();
-  };
+  });
 
   // Initial load
   onMounted(() => {
@@ -331,7 +335,7 @@
     <!-- Back button and refresh -->
     <div class="flex justify-between items-center">
       <button
-        @click="$emit('back')"
+        @click="goBack"
         class="flex items-center text-sm font-medium text-gray-600 hover:text-gray-900"
       >
         <ArrowLeftIcon class="h-4 w-4 mr-1" />
@@ -553,6 +557,43 @@
           </div>
 
           <!-- API Endpoint (only if VM is running) -->
+          <div
+            v-if="vm.status === 'RUNNING'"
+            class="bg-white shadow rounded-lg p-6"
+          >
+            <h2 class="text-lg font-medium mb-4">API Endpoint</h2>
+            <div class="mb-2">
+              <div class="flex justify-between items-center">
+                <p class="text-sm text-gray-500 mb-2">API URL</p>
+                <div class="flex space-x-2">
+                  <button
+                    @click="copyToClipboard(vm.apiEndpoint)"
+                    class="text-indigo-600 hover:text-indigo-800"
+                    title="Copy to clipboard"
+                  >
+                    <ClipboardCopyIcon class="h-4 w-4" />
+                  </button>
+                  <a
+                    v-if="vm.apiEndpoint"
+                    :href="vm.apiEndpoint"
+                    target="_blank"
+                    class="text-indigo-600 hover:text-indigo-800"
+                    title="Open in new tab"
+                  >
+                    <ExternalLinkIcon class="h-4 w-4" />
+                  </a>
+                </div>
+              </div>
+              <div
+                class="bg-gray-100 p-3 rounded-md font-mono text-sm break-all"
+              >
+                {{ vm.apiEndpoint || "Not available" }}
+              </div>
+              <div v-if="copySuccess" class="mt-1 text-xs text-green-600">
+                Copied to clipboard!
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Logs Tab -->

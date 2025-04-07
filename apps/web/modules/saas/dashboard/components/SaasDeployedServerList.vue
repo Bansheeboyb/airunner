@@ -41,6 +41,10 @@
   const isStoppingVm = ref<{ [key: string]: boolean }>({});
   const vmActionError = ref<{ [key: string]: string }>({});
 
+  // View state - controls whether to show list or details view
+  const showDetails = ref(false);
+  const selectedVmId = ref<string | null>(null);
+
   interface Vm {
     id: string;
     name: string;
@@ -451,6 +455,18 @@
     return result;
   });
 
+  // View VM details
+  const viewVmDetails = (vm: Vm) => {
+    selectedVmId.value = vm.id;
+    showDetails.value = true;
+  };
+
+  // Return from details view to list view
+  const returnToList = () => {
+    showDetails.value = false;
+    selectedVmId.value = null;
+  };
+
   // Load user's VMs on component mount
   onMounted(async () => {
     await loadUserVms();
@@ -466,239 +482,443 @@
 
 <template>
   <div class="container max-w-6xl mx-auto px-4 py-2 mt-12 mb-8">
-    <h2 class="text-2xl font-semibold mb-6">Your Deployed Models</h2>
+    <!-- Show VM details view when a VM is selected -->
+    <div v-if="showDetails">
+      <SaasVmDetails :vmId="selectedVmId" @back="returnToList" />
+    </div>
 
-    <!-- Loading state -->
-    <div
-      v-if="isLoading"
-      class="flex flex-col items-center justify-center py-16"
-    >
-      <!-- Loading spinner animation -->
-      <div class="relative w-24 h-24 mb-6">
-        <!-- Outer spinning circle -->
-        <div
-          class="absolute inset-0 rounded-full border-4 border-t-crypto-purple-600 border-r-crypto-purple-500 border-b-indigo-400 border-l-crypto-blue-600 animate-spin"
-        ></div>
+    <!-- Show VM list view when no VM is selected -->
+    <div v-else>
+      <h2 class="text-2xl font-semibold mb-6">Your Deployed Models</h2>
 
-        <!-- Inner spinning circle (opposite direction) -->
-        <div
-          class="absolute inset-3 rounded-full border-4 border-t-crypto-purple-600 border-b-crypto-teal-400 animate-spin-slow"
-        ></div>
+      <!-- Loading state -->
+      <div
+        v-if="isLoading"
+        class="flex flex-col items-center justify-center py-16"
+      >
+        <!-- Loading spinner animation -->
+        <div class="relative w-24 h-24 mb-6">
+          <!-- Outer spinning circle -->
+          <div
+            class="absolute inset-0 rounded-full border-4 border-t-crypto-purple-600 border-r-crypto-purple-500 border-b-indigo-400 border-l-crypto-blue-600 animate-spin"
+          ></div>
 
-        <!-- Center icon -->
-        <div class="absolute inset-0 flex items-center justify-center">
-          <CloudIcon class="h-8 w-8 text-crypto-blue-500" />
+          <!-- Inner spinning circle (opposite direction) -->
+          <div
+            class="absolute inset-3 rounded-full border-4 border-t-crypto-purple-600 border-b-crypto-teal-400 animate-spin-slow"
+          ></div>
+
+          <!-- Center icon -->
+          <div class="absolute inset-0 flex items-center justify-center">
+            <CloudIcon class="h-8 w-8 text-crypto-blue-500" />
+          </div>
         </div>
+
+        <h3 class="text-xl font-medium text-gray-400 mb-2">
+          Please wait while we connect to your infrastructure
+        </h3>
+        <p class="text-gray-600">Retrieving your deployed models</p>
       </div>
 
-      <h3 class="text-xl font-medium text-gray-400 mb-2">
-        Please wait while we connect to your infrastructure
-      </h3>
-      <p class="text-gray-600">Retrieving your deployed models</p>
-    </div>
-
-    <!-- Error state -->
-    <div v-else-if="error" class="bg-red-50 rounded-lg p-8 text-center mb-12">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-12 w-12 mx-auto text-red-400 mb-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-        />
-      </svg>
-      <h3 class="text-lg font-medium text-red-900 mb-2">
-        Failed to load models
-      </h3>
-      <p class="text-red-600">{{ error }}</p>
-      <button
-        @click="loadUserVms"
-        class="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-      >
-        Try Again
-      </button>
-    </div>
-
-    <!-- Empty State -->
-    <div
-      v-else-if="userVms.length === 0"
-      class="bg-gray-50 rounded-lg p-8 text-center"
-    >
-      <ServerIcon class="h-12 w-12 mx-auto text-gray-400 mb-4" />
-      <h3 class="text-lg font-medium text-gray-900 mb-2">
-        No deployed models found
-      </h3>
-      <p class="text-gray-600">You haven't deployed any models yet</p>
-    </div>
-
-    <!-- Status Navigation -->
-    <template v-else>
-      <ul
-        class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm"
-      >
-        <li v-for="(vms, status) in filteredByStatus" :key="status">
-          <div class="flex items-center gap-2 px-1 pb-3 text-sm">
-            <span
-              :class="{
-                'px-2 py-1 rounded text-xs font-semibold': true,
-                'bg-green-100 text-green-800': status === 'RUNNING',
-                'bg-yellow-100 text-yellow-800':
-                  status === 'PROVISIONING' || status === 'STAGING',
-                'bg-red-100 text-red-800':
-                  status === 'TERMINATED' ||
-                  status === 'STOPPING' ||
-                  status === 'STOPPED',
-                'bg-gray-100 text-gray-800': ![
-                  'RUNNING',
-                  'PROVISIONING',
-                  'STAGING',
-                  'TERMINATED',
-                  'STOPPING',
-                  'STOPPED',
-                ].includes(status),
-              }"
-            >
-              {{ status }}: {{ vms.length }}
-            </span>
-          </div>
-        </li>
-      </ul>
-
-      <!-- Refresh Button -->
-      <div class="flex justify-end mb-6">
+      <!-- Error state -->
+      <div v-else-if="error" class="bg-red-50 rounded-lg p-8 text-center mb-12">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-12 w-12 mx-auto text-red-400 mb-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+        <h3 class="text-lg font-medium text-red-900 mb-2">
+          Failed to load models
+        </h3>
+        <p class="text-red-600">{{ error }}</p>
         <button
           @click="loadUserVms"
-          class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center"
+          class="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
         >
-          <LoaderIcon class="h-4 w-4 mr-2" />
-          Refresh Status
+          Try Again
         </button>
       </div>
 
-      <!-- Deployed Models Grid -->
+      <!-- Empty State -->
       <div
-        v-for="(vms, status) in filteredByStatus"
-        :key="status"
-        class="mb-12 mt-8"
+        v-else-if="userVms.length === 0"
+        class="bg-gray-50 rounded-lg p-8 text-center"
       >
-        <h3 class="text-xl font-semibold mb-4">{{ status }}</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div
-            v-for="vm in vms"
-            :key="vm.id"
-            class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50"
-          >
-            <!-- Card Header with Image -->
-            <div class="relative h-40 overflow-hidden">
-              <img
-                v-if="vm.modelDetails?.imageUrl"
-                :src="vm.modelDetails.imageUrl"
-                :alt="vm.name"
-                class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              />
-              <div
-                v-else
-                class="w-full h-full flex items-center justify-center bg-gradient-to-br"
-                :class="
-                  getGradientClass(vm.modelDetails?.category || 'AI Model')
-                "
-              >
-                <ServerIcon class="h-12 w-12 text-white opacity-50" />
-              </div>
+        <ServerIcon class="h-12 w-12 mx-auto text-gray-400 mb-4" />
+        <h3 class="text-lg font-medium text-gray-900 mb-2">
+          No deployed models found
+        </h3>
+        <p class="text-gray-600">You haven't deployed any models yet</p>
+      </div>
 
-              <!-- Category Tag - Moved to top right for better visibility -->
+      <!-- Status Navigation -->
+      <template v-else>
+        <ul
+          class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm"
+        >
+          <li v-for="(vms, status) in filteredByStatus" :key="status">
+            <div class="flex items-center gap-2 px-1 pb-3 text-sm">
               <span
-                class="absolute top-2 right-2 text-xs font-medium px-3 py-1 rounded-full shadow-sm"
-                :class="getTagClass(vm.modelDetails?.category || 'AI Model')"
+                :class="{
+                  'px-2 py-1 rounded text-xs font-semibold': true,
+                  'bg-green-100 text-green-800': status === 'RUNNING',
+                  'bg-yellow-100 text-yellow-800':
+                    status === 'PROVISIONING' || status === 'STAGING',
+                  'bg-red-100 text-red-800':
+                    status === 'TERMINATED' ||
+                    status === 'STOPPING' ||
+                    status === 'STOPPED',
+                  'bg-gray-100 text-gray-800': ![
+                    'RUNNING',
+                    'PROVISIONING',
+                    'STAGING',
+                    'TERMINATED',
+                    'STOPPING',
+                    'STOPPED',
+                  ].includes(status),
+                }"
               >
-                {{ vm.modelDetails?.category || "AI Model" }}
+                {{ status }}: {{ vms.length }}
               </span>
             </div>
+          </li>
+        </ul>
 
-            <!-- Card Content with better spacing and organization -->
-            <div class="p-5 flex-grow flex flex-col">
-              <!-- Model Info Section -->
-              <div class="mb-4">
-                <!-- Company and Model Identifier -->
-                <div class="flex items-center mb-2">
-                  <div
-                    class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gradient-to-br flex items-center justify-center"
-                    :class="
-                      getGradientClass(vm.modelDetails?.category || 'AI Model')
-                    "
-                  >
-                    <MessageSquareIcon
-                      v-if="vm.modelDetails?.category === 'Text Generation'"
-                      class="size-4 text-white"
-                    />
-                    <ImageIcon
-                      v-else-if="
-                        vm.modelDetails?.category === 'Image Generation'
-                      "
-                      class="size-4 text-white"
-                    />
-                    <HeadphonesIcon
-                      v-else-if="
-                        vm.modelDetails?.category === 'Audio Transcription' ||
-                        vm.modelDetails?.category === 'Audio Generation'
-                      "
-                      class="size-4 text-white"
-                    />
-                    <VideoIcon
-                      v-else-if="
-                        vm.modelDetails?.category === 'Video Generation'
-                      "
-                      class="size-4 text-white"
-                    />
-                    <ServerIcon v-else class="size-4 text-white" />
-                  </div>
-                  <span class="font-medium text-gray-300">{{
-                    vm.labels?.model_name || "Custom Model"
-                  }}</span>
+        <!-- Refresh Button -->
+        <div class="flex justify-end mb-6">
+          <button
+            @click="loadUserVms"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center"
+          >
+            <LoaderIcon class="h-4 w-4 mr-2" />
+            Refresh Status
+          </button>
+        </div>
+
+        <!-- Deployed Models Grid -->
+        <div
+          v-for="(vms, status) in filteredByStatus"
+          :key="status"
+          class="mb-12 mt-8"
+        >
+          <h3 class="text-xl font-semibold mb-4">{{ status }}</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div
+              v-for="vm in vms"
+              :key="vm.id"
+              class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50 cursor-pointer"
+              @click="viewVmDetails(vm)"
+            >
+              <!-- Card Header with Image -->
+              <div class="relative h-40 overflow-hidden">
+                <img
+                  v-if="vm.modelDetails?.imageUrl"
+                  :src="vm.modelDetails.imageUrl"
+                  :alt="vm.name"
+                  class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+                <div
+                  v-else
+                  class="w-full h-full flex items-center justify-center bg-gradient-to-br"
+                  :class="
+                    getGradientClass(vm.modelDetails?.category || 'AI Model')
+                  "
+                >
+                  <ServerIcon class="h-12 w-12 text-white opacity-50" />
                 </div>
 
-                <!-- Model Name with better typography -->
-                <p class="text-gray-400 text-sm mb-2 font-medium">
-                  {{ vm.modelDetails?.company || "Custom" }}
+                <!-- Category Tag - Moved to top right for better visibility -->
+                <span
+                  class="absolute top-2 right-2 text-xs font-medium px-3 py-1 rounded-full shadow-sm"
+                  :class="getTagClass(vm.modelDetails?.category || 'AI Model')"
+                >
+                  {{ vm.modelDetails?.category || "AI Model" }}
+                </span>
+              </div>
+
+              <!-- Card Content with better spacing and organization -->
+              <div class="p-5 flex-grow flex flex-col">
+                <!-- Model Info Section -->
+                <div class="mb-4">
+                  <!-- Company and Model Identifier -->
+                  <div class="flex items-center mb-2">
+                    <div
+                      class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gradient-to-br flex items-center justify-center"
+                      :class="
+                        getGradientClass(
+                          vm.modelDetails?.category || 'AI Model',
+                        )
+                      "
+                    >
+                      <MessageSquareIcon
+                        v-if="vm.modelDetails?.category === 'Text Generation'"
+                        class="size-4 text-white"
+                      />
+                      <ImageIcon
+                        v-else-if="
+                          vm.modelDetails?.category === 'Image Generation'
+                        "
+                        class="size-4 text-white"
+                      />
+                      <HeadphonesIcon
+                        v-else-if="
+                          vm.modelDetails?.category === 'Audio Transcription' ||
+                          vm.modelDetails?.category === 'Audio Generation'
+                        "
+                        class="size-4 text-white"
+                      />
+                      <VideoIcon
+                        v-else-if="
+                          vm.modelDetails?.category === 'Video Generation'
+                        "
+                        class="size-4 text-white"
+                      />
+                      <ServerIcon v-else class="size-4 text-white" />
+                    </div>
+                    <span class="font-medium text-gray-300">{{
+                      vm.labels?.model_name || "Custom Model"
+                    }}</span>
+                  </div>
+
+                  <!-- Model Name with better typography -->
+                  <p class="text-gray-400 text-sm mb-2 font-medium">
+                    {{ vm.modelDetails?.company || "Custom" }}
+                  </p>
+                </div>
+
+                <!-- Status Badge - More prominent -->
+                <div class="mb-4">
+                  <span
+                    class="inline-block text-xs px-3 py-1 rounded-md font-medium"
+                    :class="getStatusClass(vm.status)"
+                  >
+                    {{ vm.status }}
+                  </span>
+
+                  <!-- Display error messages for VM actions if any -->
+                  <div
+                    v-if="vmActionError[vm.id]"
+                    class="mt-2 text-xs text-red-500"
+                  >
+                    {{ vmActionError[vm.id] }}
+                  </div>
+                </div>
+
+                <!-- Spacer to push footer to bottom -->
+                <div class="flex-grow"></div>
+
+                <!-- Card Footer with clearer separation -->
+                <div
+                  class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
+                >
+                  <!-- Creation Date -->
+                  <div class="flex items-center text-gray-400">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-4 w-4 mr-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                    <span>{{ formatDate(vm.creationTimestamp) }}</span>
+                  </div>
+
+                  <!-- Action Buttons - Depending on VM Status -->
+                  <div class="flex space-x-2" @click.stop>
+                    <!-- View API button for running VMs -->
+                    <button
+                      v-if="vm.status === 'RUNNING'"
+                      @click="viewApiEndpoint(vm)"
+                      class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200"
+                    >
+                      View API
+                    </button>
+
+                    <!-- Stop button for running VMs -->
+                    <button
+                      v-if="vm.status === 'RUNNING'"
+                      @click="stopVm(vm)"
+                      :disabled="isStoppingVm[vm.id]"
+                      class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
+                    >
+                      <LoaderIcon
+                        v-if="isStoppingVm[vm.id]"
+                        class="h-3 w-3 mr-1 animate-spin"
+                      />
+                      <StopCircleIcon v-else class="h-3 w-3 mr-1" />
+                      Stop
+                    </button>
+
+                    <!-- Start button for terminated VMs -->
+                    <button
+                      v-if="vm.status === 'TERMINATED'"
+                      @click="startVm(vm)"
+                      :disabled="isStartingVm[vm.id]"
+                      class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
+                    >
+                      <LoaderIcon
+                        v-if="isStartingVm[vm.id]"
+                        class="h-3 w-3 mr-1 animate-spin"
+                      />
+                      <PlayIcon v-else class="h-3 w-3 mr-1" />
+                      Start
+                    </button>
+
+                    <!-- Delete button for terminated VMs -->
+                    <button
+                      v-if="vm.status === 'TERMINATED'"
+                      @click="confirmDelete(vm)"
+                      class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
+                    >
+                      <TrashIcon class="h-3 w-3 mr-1" />
+                      Delete
+                    </button>
+
+                    <!-- Status indicator for transitioning states -->
+                    <div
+                      v-if="
+                        ['PROVISIONING', 'STAGING', 'STOPPING'].includes(
+                          vm.status,
+                        )
+                      "
+                      class="flex items-center bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium"
+                    >
+                      <LoaderIcon class="h-3 w-3 mr-1 animate-spin" />
+                      {{
+                        vm.status === "STOPPING" ? "Stopping..." : "Starting..."
+                      }}
+                    </div>
+
+                    <!-- Not Available button for other states -->
+                    <button
+                      v-if="
+                        ![
+                          'RUNNING',
+                          'TERMINATED',
+                          'PROVISIONING',
+                          'STAGING',
+                          'STOPPING',
+                        ].includes(vm.status)
+                      "
+                      class="bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium cursor-not-allowed opacity-50"
+                      disabled
+                    >
+                      Not Available
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- API Endpoint Modal -->
+      <div
+        v-if="showDeploymentForm"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      >
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold">
+              {{ selectedVm?.name }}
+            </h2>
+            <button
+              @click="closeDeploymentForm"
+              class="text-gray-400 hover:text-gray-600"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Status and Error Messages -->
+          <div
+            v-if="error"
+            class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
+          >
+            {{ error }}
+          </div>
+
+          <div class="bg-gray-100 p-4 rounded-md mb-4">
+            <div class="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <p class="text-sm text-gray-500">Model</p>
+                <p class="font-medium">
+                  {{ selectedVm?.labels?.model_name || "Custom Model" }}
                 </p>
               </div>
-
-              <!-- Status Badge - More prominent -->
-              <div class="mb-4">
-                <span
-                  class="inline-block text-xs px-3 py-1 rounded-md font-medium"
-                  :class="getStatusClass(vm.status)"
-                >
-                  {{ vm.status }}
-                </span>
-
-                <!-- Display error messages for VM actions if any -->
-                <div
-                  v-if="vmActionError[vm.id]"
-                  class="mt-2 text-xs text-red-500"
-                >
-                  {{ vmActionError[vm.id] }}
-                </div>
+              <div>
+                <p class="text-sm text-gray-500">Status</p>
+                <p class="font-medium">{{ selectedVm?.status }}</p>
               </div>
+              <div>
+                <p class="text-sm text-gray-500">Region</p>
+                <p class="font-medium">{{ selectedVm?.zone }}</p>
+              </div>
+              <div>
+                <p class="text-sm text-gray-500">Created</p>
+                <p class="font-medium">
+                  {{ formatDate(selectedVm?.creationTimestamp || "") }}
+                </p>
+              </div>
+            </div>
+          </div>
 
-              <!-- Spacer to push footer to bottom -->
-              <div class="flex-grow"></div>
-
-              <!-- Card Footer with clearer separation -->
+          <div v-if="deploymentStatus" @click="copyToClipboard(apiEndpoint)">
+            <p><strong>Status:</strong> {{ deploymentStatus }}</p>
+            <div v-if="apiEndpoint" class="mt-4">
+              <p class="mb-2"><strong>API Endpoint:</strong></p>
               <div
-                class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
+                class="bg-gray-100 p-3 rounded-md font-mono text-sm break-all"
               >
-                <!-- Creation Date -->
-                <div class="flex items-center text-gray-400">
+                {{ apiEndpoint }}
+              </div>
+              <div class="mt-3 flex gap-2">
+                <button
+                  @click="copyToClipboard(apiEndpoint)"
+                  class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
+                >
+                  Copy to Clipboard
+                </button>
+                <a
+                  :href="apiEndpoint"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded flex items-center"
+                >
+                  <span>Open API</span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
-                    class="h-4 w-4 mr-1"
+                    class="h-4 w-4 ml-1"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -707,301 +927,110 @@
                       stroke-linecap="round"
                       stroke-linejoin="round"
                       stroke-width="2"
-                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                     />
                   </svg>
-                  <span>{{ formatDate(vm.creationTimestamp) }}</span>
-                </div>
-
-                <!-- Action Buttons - Depending on VM Status -->
-                <div class="flex space-x-2">
-                  <!-- View API button for running VMs -->
-                  <button
-                    v-if="vm.status === 'RUNNING'"
-                    @click="viewApiEndpoint(vm)"
-                    class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200"
-                  >
-                    View API
-                  </button>
-
-                  <!-- Stop button for running VMs -->
-                  <button
-                    v-if="vm.status === 'RUNNING'"
-                    @click="stopVm(vm)"
-                    :disabled="isStoppingVm[vm.id]"
-                    class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
-                  >
-                    <LoaderIcon
-                      v-if="isStoppingVm[vm.id]"
-                      class="h-3 w-3 mr-1 animate-spin"
-                    />
-                    <StopCircleIcon v-else class="h-3 w-3 mr-1" />
-                    Stop
-                  </button>
-
-                  <!-- Start button for terminated VMs -->
-                  <button
-                    v-if="vm.status === 'TERMINATED'"
-                    @click="startVm(vm)"
-                    :disabled="isStartingVm[vm.id]"
-                    class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
-                  >
-                    <LoaderIcon
-                      v-if="isStartingVm[vm.id]"
-                      class="h-3 w-3 mr-1 animate-spin"
-                    />
-                    <PlayIcon v-else class="h-3 w-3 mr-1" />
-                    Start
-                  </button>
-
-                  <!-- Delete button for terminated VMs -->
-                  <button
-                    v-if="vm.status === 'TERMINATED'"
-                    @click="confirmDelete(vm)"
-                    class="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200 flex items-center"
-                  >
-                    <TrashIcon class="h-3 w-3 mr-1" />
-                    Delete
-                  </button>
-
-                  <!-- Status indicator for transitioning states -->
-                  <div
-                    v-if="
-                      ['PROVISIONING', 'STAGING', 'STOPPING'].includes(
-                        vm.status,
-                      )
-                    "
-                    class="flex items-center bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium"
-                  >
-                    <LoaderIcon class="h-3 w-3 mr-1 animate-spin" />
-                    {{
-                      vm.status === "STOPPING" ? "Stopping..." : "Starting..."
-                    }}
-                  </div>
-
-                  <!-- Not Available button for other states -->
-                  <button
-                    v-if="
-                      ![
-                        'RUNNING',
-                        'TERMINATED',
-                        'PROVISIONING',
-                        'STAGING',
-                        'STOPPING',
-                      ].includes(vm.status)
-                    "
-                    class="bg-gray-600 text-gray-300 px-3 py-1.5 rounded-md text-xs font-medium cursor-not-allowed opacity-50"
-                    disabled
-                  >
-                    Not Available
-                  </button>
-                </div>
+                </a>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </template>
 
-    <!-- API Endpoint Modal -->
-    <div
-      v-if="showDeploymentForm"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-    >
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-bold">
-            {{ selectedVm?.name }}
-          </h2>
-          <button
-            @click="closeDeploymentForm"
-            class="text-gray-400 hover:text-gray-600"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+          <div class="flex justify-end mt-6">
+            <button
+              @click="closeDeploymentForm"
+              class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Status and Error Messages -->
-        <div
-          v-if="error"
-          class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4"
-        >
-          {{ error }}
-        </div>
-
-        <div class="bg-gray-100 p-4 rounded-md mb-4">
-          <div class="grid grid-cols-2 gap-4 mb-4">
-            <div>
-              <p class="text-sm text-gray-500">Model</p>
-              <p class="font-medium">
-                {{ selectedVm?.labels?.model_name || "Custom Model" }}
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Status</p>
-              <p class="font-medium">{{ selectedVm?.status }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Region</p>
-              <p class="font-medium">{{ selectedVm?.zone }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-gray-500">Created</p>
-              <p class="font-medium">
-                {{ formatDate(selectedVm?.creationTimestamp || "") }}
-              </p>
-            </div>
+              Close
+            </button>
           </div>
-        </div>
-
-        <div v-if="deploymentStatus" @click="copyToClipboard(apiEndpoint)">
-          <p><strong>Status:</strong> {{ deploymentStatus }}</p>
-          <div v-if="apiEndpoint" class="mt-4">
-            <p class="mb-2"><strong>API Endpoint:</strong></p>
-            <div class="bg-gray-100 p-3 rounded-md font-mono text-sm break-all">
-              {{ apiEndpoint }}
-            </div>
-            <div class="mt-3 flex gap-2">
-              <button
-                @click="copyToClipboard(apiEndpoint)"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
-              >
-                Copy to Clipboard
-              </button>
-              <a
-                :href="apiEndpoint"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded flex items-center"
-              >
-                <span>Open API</span>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4 ml-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex justify-end mt-6">
-          <button
-            @click="closeDeploymentForm"
-            class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded"
-          >
-            Close
-          </button>
         </div>
       </div>
-    </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div
-      v-if="showDeleteConfirmation"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-    >
+      <!-- Delete Confirmation Modal -->
       <div
-        class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all"
+        v-if="showDeleteConfirmation"
+        class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
       >
-        <div class="text-center mb-5">
-          <div
-            class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-5"
-          >
-            <AlertTriangleIcon class="h-8 w-8 text-red-600" />
+        <div
+          class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 transform transition-all"
+        >
+          <div class="text-center mb-5">
+            <div
+              class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-5"
+            >
+              <AlertTriangleIcon class="h-8 w-8 text-red-600" />
+            </div>
+
+            <h3 class="text-xl font-bold text-gray-900 mb-2">
+              Confirm VM Deletion
+            </h3>
+            <p class="text-gray-600">
+              Are you sure you want to permanently delete the VM
+              <span class="font-semibold text-gray-900">{{
+                vmToDelete?.name
+              }}</span
+              >?
+            </p>
+            <p class="text-gray-600 mt-2">
+              This action cannot be undone and all associated data will be
+              permanently lost.
+            </p>
           </div>
 
-          <h3 class="text-xl font-bold text-gray-900 mb-2">
-            Confirm VM Deletion
-          </h3>
-          <p class="text-gray-600">
-            Are you sure you want to permanently delete the VM
-            <span class="font-semibold text-gray-900">{{
-              vmToDelete?.name
-            }}</span
-            >?
-          </p>
-          <p class="text-gray-600 mt-2">
-            This action cannot be undone and all associated data will be
-            permanently lost.
-          </p>
-        </div>
-
-        <!-- Status messages -->
-        <div
-          v-if="deleteError"
-          class="mb-5 p-3 bg-red-100 text-red-700 rounded-md"
-        >
-          <p>{{ deleteError }}</p>
-        </div>
-
-        <div
-          v-if="deleteSuccess"
-          class="mb-5 p-3 bg-green-100 text-green-700 rounded-md"
-        >
-          <p>{{ deleteSuccess }}</p>
-        </div>
-
-        <!-- Action buttons -->
-        <div class="flex justify-center gap-4 mt-6">
-          <button
-            @click="cancelDelete"
-            class="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md font-medium transition-colors duration-200"
-            :disabled="isDeleting"
+          <!-- Status messages -->
+          <div
+            v-if="deleteError"
+            class="mb-5 p-3 bg-red-100 text-red-700 rounded-md"
           >
-            Cancel
-          </button>
+            <p>{{ deleteError }}</p>
+          </div>
 
-          <button
-            @click="executeDelete"
-            class="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium transition-colors duration-200 flex items-center justify-center"
-            :disabled="isDeleting"
+          <div
+            v-if="deleteSuccess"
+            class="mb-5 p-3 bg-green-100 text-green-700 rounded-md"
           >
-            <svg
-              v-if="isDeleting"
-              class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
+            <p>{{ deleteSuccess }}</p>
+          </div>
+
+          <!-- Action buttons -->
+          <div class="flex justify-center gap-4 mt-6">
+            <button
+              @click="cancelDelete"
+              class="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-md font-medium transition-colors duration-200"
+              :disabled="isDeleting"
             >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-            <span>{{ isDeleting ? "Deleting..." : "Delete VM" }}</span>
-          </button>
+              Cancel
+            </button>
+
+            <button
+              @click="executeDelete"
+              class="flex-1 py-3 px-4 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium transition-colors duration-200 flex items-center justify-center"
+              :disabled="isDeleting"
+            >
+              <svg
+                v-if="isDeleting"
+                class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <span>{{ isDeleting ? "Deleting..." : "Delete VM" }}</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

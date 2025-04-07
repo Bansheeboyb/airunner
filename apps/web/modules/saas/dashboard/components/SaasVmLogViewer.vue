@@ -12,8 +12,36 @@
   } from "lucide-vue-next";
   import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 
-  // Import the types
-  import { LogLevel, LogEntry, GetVmLogsParams } from "../types/vm";
+  // Log level types
+  export enum LogLevel {
+    DEBUG = "DEBUG",
+    INFO = "INFO",
+    WARN = "WARN",
+    ERROR = "ERROR",
+    CRITICAL = "CRITICAL",
+  }
+
+  // Log entry interface
+  export interface LogEntry {
+    timestamp: string;
+    level: LogLevel;
+    message: string;
+    service?: string;
+    instance?: string;
+    requestId?: string;
+    metadata?: Record<string, any>;
+  }
+
+  // API request parameters
+  export interface GetVmLogsParams {
+    vmName: string;
+    zone: string;
+    limit?: number;
+    startTime?: string;
+    endTime?: string;
+    level?: LogLevel;
+    filter?: string;
+  }
 
   const props = defineProps<{
     vmId: string;
@@ -53,6 +81,356 @@
   const page = ref(1);
   const totalPages = ref(1);
 
+  // Mock data to simulate logs
+  const mockLogsData: LogEntry[] = [
+    {
+      timestamp: new Date(Date.now() - 30000).toISOString(),
+      level: LogLevel.INFO,
+      message: "VM started successfully",
+      service: "system",
+      instance: "vm-instance-1",
+    },
+    {
+      timestamp: new Date(Date.now() - 25000).toISOString(),
+      level: LogLevel.INFO,
+      message: "Initializing model loading process",
+      service: "model-service",
+      instance: "vm-instance-1",
+    },
+    {
+      timestamp: new Date(Date.now() - 24000).toISOString(),
+      level: LogLevel.DEBUG,
+      message: "Loading model weights from disk",
+      service: "model-service",
+      instance: "vm-instance-1",
+      metadata: {
+        modelSize: "7B",
+        diskPath: "/models/llama-7b",
+      },
+    },
+    {
+      timestamp: new Date(Date.now() - 20000).toISOString(),
+      level: LogLevel.INFO,
+      message: "Model weights loaded into memory",
+      service: "model-service",
+      instance: "vm-instance-1",
+    },
+    {
+      timestamp: new Date(Date.now() - 18000).toISOString(),
+      level: LogLevel.WARN,
+      message: "High memory usage detected: 85% of available RAM",
+      service: "system-monitor",
+      instance: "vm-instance-1",
+      metadata: {
+        totalMemory: "16GB",
+        usedMemory: "13.6GB",
+        freeMemory: "2.4GB",
+      },
+    },
+    {
+      timestamp: new Date(Date.now() - 15000).toISOString(),
+      level: LogLevel.INFO,
+      message: "Starting API server on port 8080",
+      service: "api-service",
+      instance: "vm-instance-1",
+    },
+    {
+      timestamp: new Date(Date.now() - 12000).toISOString(),
+      level: LogLevel.INFO,
+      message: "API server started successfully",
+      service: "api-service",
+      instance: "vm-instance-1",
+    },
+    {
+      timestamp: new Date(Date.now() - 10000).toISOString(),
+      level: LogLevel.INFO,
+      message: "Received API request: /v1/completions",
+      service: "api-service",
+      instance: "vm-instance-1",
+      requestId: "req-123456",
+      metadata: {
+        clientIp: "192.168.1.5",
+        method: "POST",
+        contentLength: 1024,
+      },
+    },
+    {
+      timestamp: new Date(Date.now() - 9000).toISOString(),
+      level: LogLevel.DEBUG,
+      message: "Processing completion request with prompt length: 256 tokens",
+      service: "inference-engine",
+      instance: "vm-instance-1",
+      requestId: "req-123456",
+    },
+    {
+      timestamp: new Date(Date.now() - 7000).toISOString(),
+      level: LogLevel.INFO,
+      message: "Completion generated successfully in 1.5s",
+      service: "inference-engine",
+      instance: "vm-instance-1",
+      requestId: "req-123456",
+      metadata: {
+        inputTokens: 256,
+        outputTokens: 128,
+        totalTokens: 384,
+        processingTimeMs: 1500,
+      },
+    },
+    {
+      timestamp: new Date(Date.now() - 5000).toISOString(),
+      level: LogLevel.ERROR,
+      message: "Failed to process request: Token limit exceeded",
+      service: "api-service",
+      instance: "vm-instance-1",
+      requestId: "req-789012",
+      metadata: {
+        clientIp: "192.168.1.7",
+        method: "POST",
+        error: "Token limit of 4096 exceeded: requested 5120 tokens",
+      },
+    },
+    {
+      timestamp: new Date(Date.now() - 3000).toISOString(),
+      level: LogLevel.CRITICAL,
+      message: "Out of memory error during inference",
+      service: "inference-engine",
+      instance: "vm-instance-1",
+      requestId: "req-345678",
+      metadata: {
+        requiredMemory: "18GB",
+        availableMemory: "16GB",
+        modelSize: "13B",
+      },
+    },
+    {
+      timestamp: new Date(Date.now() - 2000).toISOString(),
+      level: LogLevel.INFO,
+      message: "API request completed: /v1/embeddings",
+      service: "api-service",
+      instance: "vm-instance-1",
+      requestId: "req-901234",
+      metadata: {
+        statusCode: 200,
+        processingTimeMs: 350,
+      },
+    },
+    {
+      timestamp: new Date(Date.now() - 1000).toISOString(),
+      level: LogLevel.INFO,
+      message: "Health check passed",
+      service: "system-monitor",
+      instance: "vm-instance-1",
+    },
+    {
+      timestamp: new Date().toISOString(),
+      level: LogLevel.INFO,
+      message: "Current system stats - CPU: 42%, Memory: 85%, GPU: 78%",
+      service: "system-monitor",
+      instance: "vm-instance-1",
+      metadata: {
+        cpuUsage: 42,
+        memoryUsage: 85,
+        gpuUsage: 78,
+        diskUsage: 34,
+        networkIn: "1.2MB/s",
+        networkOut: "3.4MB/s",
+      },
+    },
+  ];
+
+  // Function to generate random logs for realistic continuous polling
+  const generateRandomLog = (): LogEntry => {
+    const services = [
+      "api-service",
+      "inference-engine",
+      "model-service",
+      "system-monitor",
+    ];
+    const levels = [
+      LogLevel.DEBUG,
+      LogLevel.INFO,
+      LogLevel.WARN,
+      LogLevel.ERROR,
+      LogLevel.CRITICAL,
+    ];
+    const levelWeights = [0.3, 0.5, 0.1, 0.07, 0.03]; // Higher probability for INFO and DEBUG
+
+    // Weighted random level selection
+    const randomLevel = () => {
+      const rand = Math.random();
+      let sum = 0;
+      for (let i = 0; i < levelWeights.length; i++) {
+        sum += levelWeights[i];
+        if (rand < sum) return levels[i];
+      }
+      return LogLevel.INFO;
+    };
+
+    const level = randomLevel();
+    const service = services[Math.floor(Math.random() * services.length)];
+    const requestId = `req-${Math.floor(Math.random() * 1000000)}`;
+
+    let message = "";
+    let metadata = undefined;
+
+    // Generate relevant messages based on level and service
+    if (service === "api-service") {
+      const endpoints = [
+        "/v1/completions",
+        "/v1/chat/completions",
+        "/v1/embeddings",
+        "/health",
+      ];
+      const endpoint = endpoints[Math.floor(Math.random() * endpoints.length)];
+
+      if (level === LogLevel.INFO) {
+        message = `Received API request: ${endpoint}`;
+        metadata = {
+          clientIp: `192.168.1.${Math.floor(Math.random() * 255)}`,
+          method: Math.random() > 0.2 ? "POST" : "GET",
+          contentLength: Math.floor(Math.random() * 5000),
+        };
+      } else if (level === LogLevel.ERROR) {
+        const errors = [
+          "Invalid API key",
+          "Token limit exceeded",
+          "Rate limit exceeded",
+          "Invalid request format",
+        ];
+        message = `Failed to process request: ${
+          errors[Math.floor(Math.random() * errors.length)]
+        }`;
+        metadata = {
+          statusCode: 400,
+          errorType: "BadRequestError",
+        };
+      } else if (level === LogLevel.DEBUG) {
+        message = `Request ${requestId} params validated successfully`;
+      }
+    } else if (service === "inference-engine") {
+      if (level === LogLevel.INFO) {
+        message = `Completion generated successfully in ${(
+          Math.random() * 2
+        ).toFixed(1)}s`;
+        metadata = {
+          inputTokens: Math.floor(Math.random() * 500),
+          outputTokens: Math.floor(Math.random() * 300),
+          processingTimeMs: Math.floor(Math.random() * 2000),
+        };
+      } else if (level === LogLevel.WARN) {
+        message = `High inference latency detected: ${Math.floor(
+          Math.random() * 5000,
+        )}ms`;
+      } else if (level === LogLevel.CRITICAL) {
+        message = "Model inference failed with CUDA error";
+        metadata = {
+          errorCode: "CUDA_OUT_OF_MEMORY",
+          gpuId: 0,
+        };
+      }
+    } else if (service === "system-monitor") {
+      const cpuUsage = Math.floor(Math.random() * 100);
+      const memoryUsage = Math.floor(Math.random() * 100);
+      const gpuUsage = Math.floor(Math.random() * 100);
+
+      if (level === LogLevel.INFO) {
+        message = `Current system stats - CPU: ${cpuUsage}%, Memory: ${memoryUsage}%, GPU: ${gpuUsage}%`;
+        metadata = {
+          cpuUsage,
+          memoryUsage,
+          gpuUsage,
+          diskUsage: Math.floor(Math.random() * 100),
+          networkIn: `${(Math.random() * 5).toFixed(1)}MB/s`,
+          networkOut: `${(Math.random() * 8).toFixed(1)}MB/s`,
+        };
+      } else if (level === LogLevel.WARN && memoryUsage > 80) {
+        message = `High memory usage detected: ${memoryUsage}% of available RAM`;
+      } else if (level === LogLevel.ERROR && cpuUsage > 90) {
+        message = `Critical CPU saturation: ${cpuUsage}%`;
+      }
+    }
+
+    // Default message if none was set
+    if (!message) {
+      message = `Log entry from ${service}`;
+    }
+
+    return {
+      timestamp: new Date().toISOString(),
+      level,
+      message,
+      service,
+      instance: "vm-instance-1",
+      requestId:
+        service === "api-service" || service === "inference-engine"
+          ? requestId
+          : undefined,
+      metadata,
+    };
+  };
+
+  // Implementation for the VM logs API
+  const getVmLogs = async (params: GetVmLogsParams): Promise<LogEntry[]> => {
+    // In a real implementation, this would make an HTTP request to your backend
+
+    // If we have existing mock data, use it
+    const existingLogs = [...mockLogsData];
+
+    // Generate some new random logs for continuous polling effect
+    if (params.vmName && params.zone) {
+      // Only generate new logs if the VM is running (would be determined by the backend)
+      const isVmRunning = props.isVmRunning;
+
+      if (isVmRunning) {
+        // Add 1-3 new logs each time
+        const newLogsCount = Math.floor(Math.random() * 3) + 1;
+        for (let i = 0; i < newLogsCount; i++) {
+          existingLogs.push(generateRandomLog());
+        }
+      }
+    }
+
+    // Sort by timestamp, newest first
+    existingLogs.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+
+    // Apply filters if provided
+    let filteredLogs = existingLogs;
+
+    if (params.level) {
+      filteredLogs = filteredLogs.filter((log) => log.level === params.level);
+    }
+
+    if (params.filter) {
+      const searchTerm = params.filter.toLowerCase();
+      filteredLogs = filteredLogs.filter(
+        (log) =>
+          log.message.toLowerCase().includes(searchTerm) ||
+          log.service?.toLowerCase().includes(searchTerm) ||
+          log.instance?.toLowerCase().includes(searchTerm),
+      );
+    }
+
+    if (params.startTime) {
+      const startTimestamp = new Date(params.startTime).getTime();
+      filteredLogs = filteredLogs.filter(
+        (log) => new Date(log.timestamp).getTime() >= startTimestamp,
+      );
+    }
+
+    if (params.endTime) {
+      const endTimestamp = new Date(params.endTime).getTime();
+      filteredLogs = filteredLogs.filter(
+        (log) => new Date(log.timestamp).getTime() <= endTimestamp,
+      );
+    }
+
+    // Apply pagination
+    return filteredLogs.slice(0, params.limit || 100);
+  };
+
   // Load logs function
   const loadLogs = async (append = false) => {
     if (isLoading.value) return;
@@ -72,7 +450,7 @@
         filter: searchQuery.value || undefined,
       };
 
-      const response = await apiCaller.vm.getVmLogs.query(params);
+      const response = await getVmLogs(params);
 
       if (append) {
         logs.value = [...logs.value, ...response];
@@ -549,7 +927,7 @@
                   log.message.toLowerCase().includes(searchQuery.toLowerCase())
                 "
               >
-                <!-- Highlight search matches -->
+                <!-- Highlight search matches with proper keying -->
                 <template
                   v-for="(part, i) in log.message.split(
                     new RegExp(`(${searchQuery})`, 'gi'),
@@ -557,11 +935,11 @@
                 >
                   <span
                     v-if="part.toLowerCase() === searchQuery.toLowerCase()"
-                    :key="i"
+                    :key="`match-${i}`"
                     class="bg-yellow-300 text-gray-900"
                     >{{ part }}</span
                   >
-                  <span v-else :key="i">{{ part }}</span>
+                  <span v-else :key="`non-match-${i}`">{{ part }}</span>
                 </template>
               </span>
               <span v-else>{{ log.message }}</span>

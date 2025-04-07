@@ -927,7 +927,7 @@
                   log.message.toLowerCase().includes(searchQuery.toLowerCase())
                 "
               >
-                <!-- Highlight search matches with proper keying -->
+                <!-- Highlight search matches with proper keying  -->
                 <template
                   v-for="(part, i) in log.message.split(
                     new RegExp(`(${searchQuery})`, 'gi'),

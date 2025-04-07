@@ -15,6 +15,9 @@
     LoaderIcon,
   } from "lucide-vue-next";
   import { ref, onMounted, computed } from "vue";
+  
+  // Import VM details component
+  import SaasVmDetails from './SaasVmDetails.vue';
 
   const { apiCaller } = useApiCaller();
   const { currentTeam } = useUser();
@@ -22,9 +25,15 @@
   // Loading state
   const isLoading = ref(true);
 
+  // Error state
+  const error = ref<string | null>(null);
+
+  // View state
+  const showDetailView = ref(false);
+  const selectedVmId = ref<string | null>(null);
+
   // Deployment state
   const showDeploymentForm = ref(false);
-  const error = ref<string | null>(null);
   const deploymentStatus = ref<string | null>(null);
   const apiEndpoint = ref<string | null>(null);
   const selectedVm = ref<Vm | null>(null);
@@ -100,7 +109,6 @@
   };
 
   // VM status checking and polling management
-  // Modified pollVmUntilFinalState function to properly handle "success" responses
   const pollVmUntilFinalState = async (vm: Vm) => {
     try {
       console.log(`Polling VM ${vm.name}...`);
@@ -438,6 +446,26 @@
     apiEndpoint.value = null;
   };
 
+  // View VM details
+  const viewVmDetails = (vmId: string) => {
+    selectedVmId.value = vmId;
+    showDetailView.value = true;
+  };
+
+  // Return to list view
+  const returnToListView = () => {
+    showDetailView.value = false;
+    selectedVmId.value = null;
+    // Refresh VM list when returning from details
+    loadUserVms();
+  };
+
+  // Find selected VM
+  const getSelectedVm = computed(() => {
+    if (!selectedVmId.value) return null;
+    return userVms.value.find(vm => vm.id === selectedVmId.value) || null;
+  });
+
   // Computed properties
   const filteredByStatus = computed(() => {
     // Group VMs by status
@@ -465,7 +493,16 @@
 </script>
 
 <template>
-  <div class="container max-w-6xl mx-auto px-4 py-2 mt-12 mb-8">
+  <!-- VM Details View -->
+  <div v-if="showDetailView && selectedVmId">
+    <SaasVmDetails 
+      :vmId="selectedVmId" 
+      @back="returnToListView" 
+    />
+  </div>
+  
+  <!-- VM List View -->
+  <div v-else class="container max-w-6xl mx-auto px-4 py-2 mt-12 mb-8">
     <h2 class="text-2xl font-semibold mb-6">Your Deployed Models</h2>
 
     <!-- Loading state -->
@@ -492,11 +529,9 @@
       </div>
 
       <h3 class="text-xl font-medium text-gray-400 mb-2">
-        Retrieving your deployed models
-      </h3>
-      <p class="text-gray-600">
         Please wait while we connect to your infrastructure
-      </p>
+      </h3>
+      <p class="text-gray-600">Retrieving your deployed models</p>
     </div>
 
     <!-- Error state -->
@@ -594,7 +629,8 @@
           <div
             v-for="vm in vms"
             :key="vm.id"
-            class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50"
+            class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50 cursor-pointer"
+            @click="viewVmDetails(vm.id)"
           >
             <!-- Card Header with Image -->
             <div class="relative h-40 overflow-hidden">
@@ -695,6 +731,7 @@
               <!-- Card Footer with clearer separation -->
               <div
                 class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
+                @click.stop  <!-- Stop click propagation for footer elements -->
               >
                 <!-- Creation Date -->
                 <div class="flex items-center text-gray-400">
@@ -883,7 +920,7 @@
               >
                 Copy to Clipboard
               </button>
-              <a
+              
                 :href="apiEndpoint"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1038,5 +1075,10 @@
 
   .animate-spin-slow {
     animation: spin-slow 4s linear infinite;
+  }
+  
+  /* Shadow effect for cards */
+  .shadow-neon {
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
   }
 </style>

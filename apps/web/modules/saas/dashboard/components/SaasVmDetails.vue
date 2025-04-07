@@ -558,20 +558,6 @@ onMounted(() => {
     "max_tokens": 100
   }'</pre>
               </div>
-              <button
-                @click="copyToClipboard(`curl -X POST \\
-  ${vm.apiEndpoint || `https://api.example.com/v1/models/${vm.name}`} \\
-  -H \"Content-Type: application/json\" \\
-  -H \"Authorization: Bearer YOUR_API_KEY\" \\
-  -d '{
-    \"prompt\": \"Hello, how can you help me today?\",
-    \"max_tokens\": 100
-  }'`)"
-                class="mt-2 text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
-              >
-                <ClipboardCopyIcon class="h-4 w-4 mr-1" />
-                Copy example
-              </button>
             </div>
             
             <div class="mt-6 flex">

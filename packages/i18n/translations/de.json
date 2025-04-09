@@ -599,5 +599,75 @@
       "map": "Map",
       "set": "Set"
     }
+  },
+  "apiKeys": {
+    "title": "Schlüssel",
+    "description": "API-Schlüssel ermöglichen Ihrem Team den Zugriff auf Aufruf- und Verwaltungsmodelle.",
+    "createKey": "Schlüssel erstellen",
+    "yesterday": "Gestern",
+    "today": "Heute",
+    "never": "Niemals",
+    "noExpiration": "Kein Ablauf",
+    "30days": "30 Tage",
+    "60days": "60 Tage",
+    "90days": "90 Tage",
+    "1year": "1 Jahr",
+    "table": {
+      "key": "Schlüssel",
+      "name": "Name",
+      "type": "Typ",
+      "created": "Erstellt",
+      "expires": " Läuft ab",
+      "lastUsed": " Zuletzt verwendet",
+      "actions": " Aktionen"
+    },
+    "loading": " Laden Ihrer API-Schlüssel",
+    "noKeysFound": "Keine Schlüssel gefunden",
+    "personal": "Persönlich",
+    "team": "Team",
+    "dialog": {
+      "create": "Erstellen",
+      "cancel": " Stornieren",
+      "createKey": {
+        "expiryPlaceholder": "Läuft ab",
+        "expiryLabel": "Läuft ab",
+        "typeLabel": "Typ",
+        "nameLabel": " Name",
+        "description": " Erstellen Sie einen neuen API-Schlüssel, seinen Typ und seine Ablaufdauer."
+      },
+      "keyCreated": {
+        "title": " Schlüssel erstellt!",
+        "description": "Bewahren Sie eine Kopie Ihres Schlüssels auf, da der vollständige Schlüssel nur dieses eine Mal angezeigt wird.",
+        "copy": "In die Zwischenablage kopieren"
+      },
+      "done": "Erledigt"
+    },
+    "notifications": {
+      "deleteKey": {
+        "success": {
+          "title": "Schlüssel erfolgreich gelöscht!"
+        },
+        "error": {
+          "title": "Fehler beim Löschen des Schlüssels!"
+        },
+        "loading": {
+          "description": "Ausgewählten Schlüssel löschen."
+        }
+      },
+      "createKey": {
+        "success": {
+          "title": "Schlüssel erfolgreich erstellt!"
+        },
+        "error": {
+          "title": "Fehler beim Erstellen des Schlüssels!"
+        },
+        "loading": {
+          "description": "Erstellen Ihres API-Schlüssels."
+        }
+      },
+      "keyCopied": {
+        "title": "Schlüssel in Ihre Zwischenablage kopiert!"
+      }
+    }
   }
 }

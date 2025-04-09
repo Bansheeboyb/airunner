@@ -208,129 +208,101 @@
       </p>
 
       <!-- Filter Buttons -->
-      <div class="flex gap-2">
-        <Button
-          size="sm"
-          :variant="filterType === 'ALL' ? 'default' : 'outline'"
-          @click="
-            filterType = 'ALL';
-            loadApiKeys();
-          "
-        >
-          {{ t("apiKeys.allKeys") }}
-        </Button>
-        <Button
-          size="sm"
-          :variant="filterType === 'PERSONAL' ? 'default' : 'outline'"
-          @click="
-            filterType = 'PERSONAL';
-            loadApiKeys();
-          "
-        >
-          {{ t("apiKeys.personalKeys") }}
-        </Button>
-        <Button
-          v-if="props.teamId"
-          size="sm"
-          :variant="filterType === 'TEAM' ? 'default' : 'outline'"
-          @click="
-            filterType = 'TEAM';
-            loadApiKeys();
-          "
-        >
-          {{ t("apiKeys.teamKeys") }}
-        </Button>
-      </div>
+      <div class="flex gap-2"></div>
 
       <!-- API Keys Table -->
       <div class="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{{ t("apiKeys.table.name") }}</TableHead>
-              <TableHead>{{ t("apiKeys.table.key") }}</TableHead>
-              <TableHead>{{ t("apiKeys.table.type") }}</TableHead>
-              <TableHead>{{ t("apiKeys.table.created") }}</TableHead>
-              <TableHead>{{ t("apiKeys.table.expires") }}</TableHead>
-              <TableHead>{{ t("apiKeys.table.lastUsed") }}</TableHead>
-              <TableHead class="text-right">{{
-                t("apiKeys.table.actions")
-              }}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody v-if="isLoading">
-            <TableRow>
-              <TableCell colspan="7" class="h-24 text-center">
-                <div class="flex justify-center items-center">
-                  <!-- You can use your loading spinner component here -->
-                  {{ t("apiKeys.loading") }}
-                </div>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-          <TableBody v-else-if="filteredApiKeys.length === 0">
-            <TableRow>
-              <TableCell
-                colspan="7"
-                class="h-24 text-center text-muted-foreground"
-              >
-                {{ t("apiKeys.noKeysFound") }}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-          <TableBody v-else>
-            <TableRow v-for="key in filteredApiKeys" :key="key.id">
-              <TableCell>
-                <div>
-                  <span class="font-medium">{{ key.name }}</span>
-                  <span
-                    v-if="key.type === 'TEAM'"
-                    class="ml-2 text-xs text-muted-foreground"
+        <div class="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{{ t("apiKeys.table.name") }}</TableHead>
+                <TableHead>{{ t("apiKeys.table.key") }}</TableHead>
+                <TableHead>{{ t("apiKeys.table.type") }}</TableHead>
+                <TableHead>{{ t("apiKeys.table.created") }}</TableHead>
+                <TableHead>{{ t("apiKeys.table.expires") }}</TableHead>
+                <TableHead>{{ t("apiKeys.table.lastUsed") }}</TableHead>
+                <TableHead class="text-right">{{
+                  t("apiKeys.table.actions")
+                }}</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody v-if="isLoading">
+              <TableRow>
+                <TableCell colspan="7" class="h-24 text-center">
+                  <div class="flex justify-center items-center">
+                    <!-- You can use your loading spinner component here -->
+                    {{ t("apiKeys.loading") }}
+                  </div>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+            <TableBody v-else-if="filteredApiKeys.length === 0">
+              <TableRow>
+                <TableCell
+                  colspan="7"
+                  class="h-24 text-center text-muted-foreground"
+                >
+                  {{ t("apiKeys.noKeysFound") }}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+            <TableBody v-else>
+              <TableRow v-for="key in filteredApiKeys" :key="key.id">
+                <TableCell>
+                  <div>
+                    <span class="font-medium">{{ key.name }}</span>
+                    <span
+                      v-if="key.type === 'TEAM'"
+                      class="ml-2 text-xs text-muted-foreground"
+                    >
+                      ({{ key.team?.name }})
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <code class="bg-muted px-2 py-1 rounded font-mono text-xs">
+                    {{ key.keyPrefix }}•••••••••••••
+                  </code>
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    :variant="key.type === 'PERSONAL' ? 'secondary' : 'default'"
                   >
-                    ({{ key.team?.name }})
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <code class="bg-muted px-2 py-1 rounded font-mono text-xs">
-                  {{ key.keyPrefix }}•••••••••••••
-                </code>
-              </TableCell>
-              <TableCell>
-                <Badge
-                  :variant="key.type === 'PERSONAL' ? 'secondary' : 'default'"
-                >
-                  {{ key.type }}
-                </Badge>
-              </TableCell>
-              <TableCell class="text-muted-foreground text-sm">
-                {{ formatRelativeTime(key.createdAt) }}
-              </TableCell>
-              <TableCell class="text-muted-foreground text-sm">
-                {{
-                  key.expiresAt ? formatDate(key.expiresAt) : t("apiKeys.never")
-                }}
-              </TableCell>
-              <TableCell class="text-muted-foreground text-sm">
-                {{
-                  key.lastUsedAt
-                    ? formatRelativeTime(key.lastUsedAt)
-                    : t("apiKeys.never")
-                }}
-              </TableCell>
-              <TableCell class="text-right">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  @click="deleteApiKey(key.id)"
-                  class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  <TrashIcon class="size-4" />
-                </Button>
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+                    {{ key.type }}
+                  </Badge>
+                </TableCell>
+                <TableCell class="text-muted-foreground text-sm">
+                  {{ formatRelativeTime(key.createdAt) }}
+                </TableCell>
+                <TableCell class="text-muted-foreground text-sm">
+                  {{
+                    key.expiresAt
+                      ? formatDate(key.expiresAt)
+                      : t("apiKeys.never")
+                  }}
+                </TableCell>
+                <TableCell class="text-muted-foreground text-sm">
+                  {{
+                    key.lastUsedAt
+                      ? formatRelativeTime(key.lastUsedAt)
+                      : t("apiKeys.never")
+                  }}
+                </TableCell>
+                <TableCell class="text-right">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    @click="deleteApiKey(key.id)"
+                    class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <TrashIcon class="size-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       <!-- Create API Key Dialog -->
@@ -348,61 +320,54 @@
               <Label for="name" class="text-right">
                 {{ t("apiKeys.dialog.createKey.nameLabel") }}
               </Label>
-              <Input
-                id="name"
-                v-model="newKeyName"
-                :placeholder="t('apiKeys.dialog.createKey.namePlaceholder')"
-                class="col-span-3"
-              />
+              <Input id="name" v-model="newKeyName" class="col-span-3" />
             </div>
 
             <div class="grid grid-cols-4 items-center gap-4">
               <Label for="type" class="text-right">
                 {{ t("apiKeys.dialog.createKey.typeLabel") }}
               </Label>
-              <Select
-                v-model="newKeyType"
-                :disabled="!props.teamId"
-                class="col-span-3"
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    :placeholder="t('apiKeys.dialog.createKey.typePlaceholder')"
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PERSONAL">
-                    {{ t("apiKeys.personal") }}
-                  </SelectItem>
-                  <SelectItem v-if="props.teamId" value="TEAM">
-                    {{ t("apiKeys.team") }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <div class="col-span-3" style="min-width: 250px; width: 100%">
+                <Select
+                  v-model="newKeyType"
+                  :disabled="!props.teamId"
+                  class="w-full"
+                >
+                  <SelectTrigger style="width: 100%">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent style="min-width: 250px">
+                    <SelectItem value="PERSONAL">
+                      {{ t("apiKeys.personal") }}
+                    </SelectItem>
+                    <SelectItem v-if="props.teamId" value="TEAM">
+                      {{ t("apiKeys.team") }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div class="grid grid-cols-4 items-center gap-4">
               <Label for="expiry" class="text-right">
                 {{ t("apiKeys.dialog.createKey.expiryLabel") }}
               </Label>
-              <Select v-model="selectedExpiryOption" class="col-span-3">
-                <SelectTrigger>
-                  <SelectValue
-                    :placeholder="
-                      t('apiKeys.dialog.createKey.expiryPlaceholder')
-                    "
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem
-                    v-for="option in expiryOptions"
-                    :key="option.label"
-                    :value="option.value"
-                  >
-                    {{ option.label }}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <div class="col-span-3" style="min-width: 250px; width: 100%">
+                <Select v-model="selectedExpiryOption" class="w-full">
+                  <SelectTrigger style="width: 100%">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent style="min-width: 250px">
+                    <SelectItem
+                      v-for="option in expiryOptions"
+                      :key="option.label"
+                      :value="option.value"
+                    >
+                      {{ option.label }}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

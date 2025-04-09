@@ -216,7 +216,6 @@
     "subtitle": "Be among the first to get access to supastarter.nuxt.",
     "title": "Get early access"
   },
-
   "onboarding": {
     "continue": "Continue",
     "complete": "Complete",
@@ -593,6 +592,78 @@
       "regex": "regex",
       "url": "url",
       "uuid": "uuid"
+    }
+  },
+  "apiKeys": {
+    "dialog": {
+      "createKey": {
+        "title": "API Keys",
+        "expiryPlaceholder": "Never",
+        "expiryLabel": "Expires",
+        "typePlaceholder": "Type",
+        "typeLabel": "Type",
+        "nameLabel": "Name",
+        "description": "Create a new API Key, its type, and its expiration period."
+      },
+      "create": "Create",
+      "cancel": "Cancel",
+      "keyCreated": {
+        "title": "Key Created!",
+        "description": "Save a copy of your key because the full key will only be displayed this one time.",
+        "copy": "Copy to clipboard"
+      },
+      "done": "Done"
+    },
+    "title": "API Keys",
+    "description": "API keys enable access to call and manage models for your team.",
+    "createKey": "Create Key",
+    "yesterday": "Yesterday",
+    "today": "Today",
+    "never": "Never",
+    "noExpiration": "No expiration",
+    "30days": "30 days",
+    "60days": "60 days",
+    "90days": "90 days",
+    "1year": "1 year",
+    "table": {
+      "name": "Name",
+      "key": "Key",
+      "type": "Type",
+      "created": "Created",
+      "expires": "Expires",
+      "lastUsed": "Last Used",
+      "actions": "Actions"
+    },
+    "loading": "Loading Your Api Keys",
+    "noKeysFound": "No Keys Found",
+    "personal": "Personal",
+    "team": "Team",
+    "notifications": {
+      "deleteKey": {
+        "success": {
+          "title": "Key deleted successfully!"
+        },
+        "error": {
+          "title": "Error Deleting Key!"
+        },
+        "loading": {
+          "description": "Deleting selected key."
+        }
+      },
+      "createKey": {
+        "success": {
+          "title": "Key created successfully!"
+        },
+        "error": {
+          "title": "Error creating key!"
+        },
+        "loading": {
+          "description": "Creating your api key."
+        }
+      },
+      "keyCopied": {
+        "title": "Key copied to your clipboard!"
+      }
     }
   }
 }

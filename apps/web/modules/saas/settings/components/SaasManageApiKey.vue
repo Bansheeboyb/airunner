@@ -3,6 +3,46 @@
   import { useToast } from "@/modules/ui/components/toast";
   import { ApiKeyType } from "database";
   import { CopyIcon, TrashIcon, PlusIcon } from "lucide-vue-next";
+  import { useTranslations } from "@/modules/shared/composables/useTranslations";
+  import { useApiCaller } from "@/modules/shared/composables/useApiCaller";
+  import { Button } from "@/modules/ui/components/button";
+  import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+  } from "@/modules/ui/components/table";
+  import { Badge } from "@/modules/ui/components/badge";
+  import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+  } from "@/modules/ui/components/dialog";
+  import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+  } from "@/modules/ui/components/alert-dialog";
+  import { Label } from "@/modules/ui/components/label";
+  import { Input } from "@/modules/ui/components/input";
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/modules/ui/components/select";
+  import SaasActionBlock from "@/modules/saas/shared/components/SaasActionBlock.vue";
 
   const props = defineProps<{
     teamId?: string;
@@ -14,11 +54,13 @@
   const { toast, dismiss } = useToast();
 
   // State
-  const apiKeys = ref([]);
+  const apiKeys = ref<any[]>([]);
   const isLoading = ref(true);
   const filterType = ref(props.defaultType || "ALL");
   const showNewKeyDialog = ref(false);
   const showKeyRevealDialog = ref(false);
+  const showDeleteDialog = ref(false);
+  const keyToDelete = ref<string | null>(null);
   const newKeyName = ref("");
   const newKeyType = ref(props.defaultType || "PERSONAL");
   const newKeyExpiry = ref<Date | null>(null);
@@ -30,7 +72,7 @@
     { label: t("apiKeys.90days"), value: 90 },
     { label: t("apiKeys.1year"), value: 365 },
   ];
-  const selectedExpiryOption = ref(null);
+  const selectedExpiryOption = ref<number | null>(null);
 
   // Computed
   const filteredApiKeys = computed(() => {
@@ -52,7 +94,7 @@
         teamId: props.teamId,
       });
       apiKeys.value = result;
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: "error",
         title: t("apiKeys.notifications.loadFailed.title"),
@@ -82,8 +124,8 @@
       }
 
       // Only add expiration date if one is selected and it has a value
-      if (selectedExpiryOption.value) {
-        const days = parseInt(selectedExpiryOption.value);
+      if (selectedExpiryOption.value !== null) {
+        const days = selectedExpiryOption.value;
         const date = new Date();
         date.setDate(date.getDate() + days);
         requestData.expiresAt = date;
@@ -107,7 +149,7 @@
         title: t("apiKeys.notifications.createKey.success.title"),
       });
       dismiss(loadingToast.id);
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: "error",
         title: t("apiKeys.notifications.createKey.error.title"),
@@ -116,11 +158,13 @@
     }
   };
 
-  const deleteApiKey = async (keyId) => {
-    // Using confirm for now, but could be replaced with a modal dialog
-    if (!confirm(t("apiKeys.confirmDelete"))) {
-      return;
-    }
+  const confirmDeleteApiKey = (keyId: string) => {
+    keyToDelete.value = keyId;
+    showDeleteDialog.value = true;
+  };
+
+  const deleteApiKey = async () => {
+    if (!keyToDelete.value) return;
 
     const loadingToast = toast({
       variant: "loading",
@@ -129,14 +173,14 @@
 
     try {
       // Pass the keyId directly as a string, not as an object
-      await apiCaller.team.deleteApiKey.mutate(keyId);
+      await apiCaller.team.deleteApiKey.mutate(keyToDelete.value);
       await loadApiKeys();
 
       toast({
         variant: "success",
         title: t("apiKeys.notifications.deleteKey.success.title"),
       });
-    } catch (error) {
+    } catch (error: any) {
       toast({
         variant: "error",
         title: t("apiKeys.notifications.deleteKey.error.title"),
@@ -144,10 +188,12 @@
       });
     } finally {
       dismiss(loadingToast.id);
+      showDeleteDialog.value = false;
+      keyToDelete.value = null;
     }
   };
 
-  const copyApiKey = (key) => {
+  const copyApiKey = (key: string) => {
     navigator.clipboard.writeText(key);
     toast({
       variant: "success",
@@ -155,17 +201,17 @@
     });
   };
 
-  const formatDate = (date) => {
+  const formatDate = (date: string | Date | null) => {
     if (!date) return t("apiKeys.never");
     return new Date(date).toLocaleDateString();
   };
 
-  const formatRelativeTime = (dateString) => {
+  const formatRelativeTime = (dateString: string | null) => {
     if (!dateString) return "";
 
     const date = new Date(dateString);
     const now = new Date();
-    const diffTime = Math.abs(date - now);
+    const diffTime = Math.abs(date.getTime() - now.getTime());
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) {
@@ -190,6 +236,10 @@
   onMounted(() => {
     loadApiKeys();
   });
+
+  defineExpose({
+    loadApiKeys,
+  });
 </script>
 
 <template>
@@ -211,97 +261,126 @@
       <div class="flex gap-2"></div>
 
       <!-- API Keys Table -->
-      <div class="rounded-md border">
-        <div class="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{{ t("apiKeys.table.name") }}</TableHead>
-                <TableHead>{{ t("apiKeys.table.key") }}</TableHead>
-                <TableHead>{{ t("apiKeys.table.type") }}</TableHead>
-                <TableHead>{{ t("apiKeys.table.created") }}</TableHead>
-                <TableHead>{{ t("apiKeys.table.expires") }}</TableHead>
-                <TableHead>{{ t("apiKeys.table.lastUsed") }}</TableHead>
-                <TableHead class="text-right">{{
-                  t("apiKeys.table.actions")
-                }}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody v-if="isLoading">
-              <TableRow>
-                <TableCell colspan="7" class="h-24 text-center">
-                  <div class="flex justify-center items-center">
-                    <!-- You can use your loading spinner component here -->
-                    {{ t("apiKeys.loading") }}
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-            <TableBody v-else-if="filteredApiKeys.length === 0">
-              <TableRow>
-                <TableCell
-                  colspan="7"
-                  class="h-24 text-center text-muted-foreground"
-                >
-                  {{ t("apiKeys.noKeysFound") }}
-                </TableCell>
-              </TableRow>
-            </TableBody>
-            <TableBody v-else>
-              <TableRow v-for="key in filteredApiKeys" :key="key.id">
-                <TableCell>
-                  <div>
-                    <span class="font-medium">{{ key.name }}</span>
-                    <span
-                      v-if="key.type === 'TEAM'"
-                      class="ml-2 text-xs text-muted-foreground"
+      <div class="rounded-md border w-80 sm:w-full">
+        <div
+          class="overflow-x-auto"
+          style="-webkit-overflow-scrolling: touch; max-width: 100vw"
+        >
+          <div class="inline-block align-middle">
+            <div class="w-full">
+              <Table class="w-full">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead class="whitespace-nowrap">{{
+                      t("apiKeys.table.name")
+                    }}</TableHead>
+                    <TableHead class="whitespace-nowrap">{{
+                      t("apiKeys.table.key")
+                    }}</TableHead>
+                    <TableHead class="whitespace-nowrap">{{
+                      t("apiKeys.table.type")
+                    }}</TableHead>
+                    <TableHead class="whitespace-nowrap">{{
+                      t("apiKeys.table.created")
+                    }}</TableHead>
+                    <TableHead class="whitespace-nowrap">{{
+                      t("apiKeys.table.expires")
+                    }}</TableHead>
+                    <TableHead class="whitespace-nowrap">{{
+                      t("apiKeys.table.lastUsed")
+                    }}</TableHead>
+                    <TableHead class="text-right whitespace-nowrap">{{
+                      t("apiKeys.table.actions")
+                    }}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody v-if="isLoading">
+                  <TableRow>
+                    <TableCell colspan="7" class="h-24 text-center">
+                      <div class="flex justify-center items-center">
+                        <!-- You can use your loading spinner component here -->
+                        {{ t("apiKeys.loading") }}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+                <TableBody v-else-if="filteredApiKeys.length === 0">
+                  <TableRow>
+                    <TableCell
+                      colspan="7"
+                      class="h-24 text-center text-muted-foreground"
                     >
-                      ({{ key.team?.name }})
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <code class="bg-muted px-2 py-1 rounded font-mono text-xs">
-                    {{ key.keyPrefix }}•••••••••••••
-                  </code>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    :variant="key.type === 'PERSONAL' ? 'secondary' : 'default'"
-                  >
-                    {{ key.type }}
-                  </Badge>
-                </TableCell>
-                <TableCell class="text-muted-foreground text-sm">
-                  {{ formatRelativeTime(key.createdAt) }}
-                </TableCell>
-                <TableCell class="text-muted-foreground text-sm">
-                  {{
-                    key.expiresAt
-                      ? formatDate(key.expiresAt)
-                      : t("apiKeys.never")
-                  }}
-                </TableCell>
-                <TableCell class="text-muted-foreground text-sm">
-                  {{
-                    key.lastUsedAt
-                      ? formatRelativeTime(key.lastUsedAt)
-                      : t("apiKeys.never")
-                  }}
-                </TableCell>
-                <TableCell class="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    @click="deleteApiKey(key.id)"
-                    class="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <TrashIcon class="size-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+                      {{ t("apiKeys.noKeysFound") }}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+                <TableBody v-else>
+                  <TableRow v-for="key in filteredApiKeys" :key="key.id">
+                    <TableCell class="whitespace-nowrap">
+                      <div>
+                        <span class="font-medium">{{ key.name }}</span>
+                        <span
+                          v-if="key.type === 'TEAM'"
+                          class="ml-2 text-xs text-muted-foreground"
+                        >
+                          ({{ key.team?.name }})
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell class="whitespace-nowrap">
+                      <code
+                        class="bg-muted px-2 py-1 rounded font-mono text-xs"
+                      >
+                        {{ key.keyPrefix }}•••••••••••••
+                      </code>
+                    </TableCell>
+                    <TableCell class="whitespace-nowrap">
+                      <Badge
+                        :variant="
+                          key.type === 'PERSONAL' ? 'secondary' : 'default'
+                        "
+                      >
+                        {{ key.type }}
+                      </Badge>
+                    </TableCell>
+                    <TableCell
+                      class="text-muted-foreground text-sm whitespace-nowrap"
+                    >
+                      {{ formatRelativeTime(key.createdAt) }}
+                    </TableCell>
+                    <TableCell
+                      class="text-muted-foreground text-sm whitespace-nowrap"
+                    >
+                      {{
+                        key.expiresAt
+                          ? formatDate(key.expiresAt)
+                          : t("apiKeys.never")
+                      }}
+                    </TableCell>
+                    <TableCell
+                      class="text-muted-foreground text-sm whitespace-nowrap"
+                    >
+                      {{
+                        key.lastUsedAt
+                          ? formatRelativeTime(key.lastUsedAt)
+                          : t("apiKeys.never")
+                      }}
+                    </TableCell>
+                    <TableCell class="text-right whitespace-nowrap">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        @click="confirmDeleteApiKey(key.id)"
+                        class="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <TrashIcon class="size-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -425,6 +504,31 @@
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <!-- Delete API Key Alert Dialog -->
+      <AlertDialog
+        :open="showDeleteDialog"
+        @update:open="(open: boolean) => (showDeleteDialog = open)"
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle class="text-destructive">
+              {{ t("apiKeys.dialog.deleteKey.title") }}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {{ t("apiKeys.dialog.deleteKey.confirmation") }}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel @click="showDeleteDialog = false">
+              {{ t("common.confirmation.cancel") }}
+            </AlertDialogCancel>
+            <AlertDialogAction variant="destructive" @click="deleteApiKey">
+              {{ t("apiKeys.dialog.deleteKey.submit") }}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   </SaasActionBlock>
 </template>

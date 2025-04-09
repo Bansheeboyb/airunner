@@ -605,6 +605,11 @@
         "nameLabel": "Name",
         "description": "Create a new API Key, its type, and its expiration period."
       },
+      "deleteKey": {
+        "title": "Delete API Key",
+        "confirmation": "Are you sure you want to delete this API key? This action cannot be undone.",
+        "submit": "Delete"
+      },
       "create": "Create",
       "cancel": "Cancel",
       "keyCreated": {

@@ -635,6 +635,11 @@
         "nameLabel": " Name",
         "description": " Erstellen Sie einen neuen API-Schlüssel, seinen Typ und seine Ablaufdauer."
       },
+      "deleteKey": {
+        "title": "API-Schlüssel löschen",
+        "confirmation": "Sind Sie sicher, dass Sie diesen API-Schlüssel löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden.",
+        "submit": "Löschen"
+      },
       "keyCreated": {
         "title": " Schlüssel erstellt!",
         "description": "Bewahren Sie eine Kopie Ihres Schlüssels auf, da der vollständige Schlüssel nur dieses eine Mal angezeigt wird.",

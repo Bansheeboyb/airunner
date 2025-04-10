@@ -519,15 +519,15 @@
   const getLogSeverityClass = (severity: string) => {
     const severityLower = severity.toLowerCase();
     if (severityLower.includes('error') || severityLower === 'fatal' || severityLower === 'critical') {
-      return 'bg-red-100 text-red-800';
+      return 'bg-red-900/50 text-red-300';
     } else if (severityLower.includes('warn')) {
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-yellow-900/50 text-yellow-300';
     } else if (severityLower === 'info') {
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-blue-900/50 text-blue-300';
     } else if (severityLower === 'debug') {
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-gray-700 text-gray-300';
     }
-    return 'bg-gray-100 text-gray-600';
+    return 'bg-gray-700 text-gray-300';
   };
   
   // Get severity icon
@@ -922,18 +922,18 @@
           </div>
         </div>
 
-        <!-- Logs Tab -->
+        <!-- Logs Tab - Dark Theme Version -->
         <div v-else-if="activeTab === 'logs'" class="space-y-6">
-          <div class="bg-white shadow rounded-lg overflow-hidden">
-            <div class="p-6 border-b border-gray-100">
+          <div class="bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-800">
+            <div class="p-6 border-b border-gray-800">
               <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold text-gray-900">VM Logs</h2>
+                <h2 class="text-xl font-semibold text-gray-100">VM Logs</h2>
                 <div class="flex space-x-2">
                   <button
                     class="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors duration-200"
                     :class="logsAutoRefresh 
-                      ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' 
-                      : 'bg-gray-50 text-gray-700 hover:bg-gray-100'"
+                      ? 'bg-indigo-900/60 text-indigo-300 hover:bg-indigo-800/70' 
+                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'"
                     @click="toggleLogsAutoRefresh"
                     title="Auto refresh logs"
                   >
@@ -944,7 +944,7 @@
                     {{ logsAutoRefresh ? 'Auto-refreshing' : 'Auto-refresh' }}
                   </button>
                   <button
-                    class="inline-flex items-center px-3 py-1.5 bg-gray-50 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors duration-200"
+                    class="inline-flex items-center px-3 py-1.5 bg-gray-800 text-gray-300 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors duration-200"
                     @click="loadVmLogs"
                     :disabled="isLoadingLogs"
                     title="Refresh logs"
@@ -957,7 +957,7 @@
                   </button>
                   <button
                     v-if="vmLogs.length > 0"
-                    class="inline-flex items-center px-3 py-1.5 bg-gray-50 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors duration-200"
+                    class="inline-flex items-center px-3 py-1.5 bg-gray-800 text-gray-300 rounded-md text-sm font-medium hover:bg-gray-700 transition-colors duration-200"
                     @click="downloadLogs"
                     title="Download logs as JSON"
                   >
@@ -971,21 +971,21 @@
               <div class="mb-4 flex flex-col md:flex-row gap-3">
                 <div class="flex-1 relative">
                   <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <SearchIcon class="h-4 w-4 text-gray-400" />
+                    <SearchIcon class="h-4 w-4 text-gray-500" />
                   </div>
                   <input
                     type="text"
                     v-model="logSearchQuery"
                     @keyup.enter="loadVmLogs"
                     placeholder="Search logs..."
-                    class="pl-10 block w-full rounded-md border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    class="pl-10 block w-full rounded-md bg-gray-800 border-gray-700 text-gray-300 placeholder-gray-500 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   />
                 </div>
                 <div class="flex gap-2">
                   <select
                     v-model="logFilter"
                     @change="loadVmLogs"
-                    class="rounded-md border-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                    class="rounded-md bg-gray-800 border-gray-700 text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   >
                     <option v-for="option in logFilterOptions" :key="option.id" :value="option.id">
                       {{ option.label }}
@@ -993,7 +993,7 @@
                   </select>
                   <button
                     v-if="logSearchQuery || logFilter !== 'all'"
-                    class="inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                    class="inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-700 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-300"
                     @click="clearLogsFilter"
                     title="Clear filters"
                   >
@@ -1004,30 +1004,30 @@
             </div>
 
             <!-- Loading state -->
-            <div v-if="isLoadingLogs && !vmLogs.length" class="py-16 text-center bg-gray-50">
+            <div v-if="isLoadingLogs && !vmLogs.length" class="py-16 text-center bg-gray-800">
               <div class="relative w-16 h-16 mx-auto mb-4">
-                <div class="absolute inset-0 rounded-full border-4 border-t-indigo-600 border-r-indigo-500 border-b-indigo-400 border-l-indigo-600 animate-spin"></div>
+                <div class="absolute inset-0 rounded-full border-4 border-t-indigo-400 border-r-indigo-500 border-b-indigo-600 border-l-indigo-400 animate-spin"></div>
               </div>
-              <p class="text-gray-600 font-medium">Loading logs...</p>
+              <p class="text-gray-300 font-medium">Loading logs...</p>
             </div>
 
             <!-- Error state -->
             <div v-else-if="logsError && !vmLogs.length" class="p-6">
-              <div class="bg-red-50 border border-red-100 rounded-lg p-4">
+              <div class="bg-red-900/30 border border-red-800 rounded-lg p-4">
                 <div class="flex">
                   <div class="flex-shrink-0">
-                    <AlertCircleIcon class="h-5 w-5 text-red-500" />
+                    <AlertCircleIcon class="h-5 w-5 text-red-400" />
                   </div>
                   <div class="ml-3">
-                    <h3 class="text-sm font-medium text-red-800">Error loading logs</h3>
-                    <div class="mt-2 text-sm text-red-700">
+                    <h3 class="text-sm font-medium text-red-300">Error loading logs</h3>
+                    <div class="mt-2 text-sm text-red-200">
                       <p>{{ logsError }}</p>
                     </div>
                     <div class="mt-4">
                       <button
                         type="button"
                         @click="loadVmLogs"
-                        class="inline-flex items-center px-3 py-1.5 rounded-md bg-red-50 text-sm font-medium text-red-800 hover:bg-red-100 transition-colors duration-200"
+                        class="inline-flex items-center px-3 py-1.5 rounded-md bg-red-900/30 text-sm font-medium text-red-300 hover:bg-red-800/40 transition-colors duration-200"
                       >
                         <RefreshCwIcon class="h-4 w-4 mr-1.5" />
                         Try again
@@ -1039,29 +1039,29 @@
             </div>
 
             <!-- Logs Table View -->
-            <div v-else-if="vmLogs.length > 0" class="bg-white">
+            <div v-else-if="vmLogs.length > 0" class="bg-gray-900">
               <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                  <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-gray-800">
+                  <thead class="bg-gray-800">
                     <tr>
-                      <th scope="col" class="pl-6 pr-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" class="pl-6 pr-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Time
                       </th>
-                      <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Severity
                       </th>
-                      <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" class="px-3 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Message
                       </th>
-                      <th scope="col" class="pl-3 pr-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" class="pl-3 pr-6 py-3 text-right text-xs font-medium text-gray-400 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody class="bg-white divide-y divide-gray-200">
+                  <tbody class="bg-gray-900 divide-y divide-gray-800">
                     <template v-for="log in vmLogs" :key="log.id">
-                      <tr class="hover:bg-gray-50 transition-colors duration-150">
-                        <td class="pl-6 pr-3 py-3 whitespace-nowrap text-xs text-gray-500">
+                      <tr class="hover:bg-gray-800/70 transition-colors duration-150">
+                        <td class="pl-6 pr-3 py-3 whitespace-nowrap text-xs text-gray-400">
                           {{ formatLogTimestamp(log.timestamp) }}
                         </td>
                         <td class="px-3 py-3 whitespace-nowrap">
@@ -1073,44 +1073,44 @@
                             {{ log.severity }}
                           </span>
                         </td>
-                        <td class="px-3 py-3 text-xs text-gray-900">
+                        <td class="px-3 py-3 text-xs text-gray-300">
                           <div class="truncate max-w-md">{{ log.message }}</div>
                         </td>
                         <td class="pl-3 pr-6 py-3 whitespace-nowrap text-right text-xs">
                           <button 
                             @click="showLogDetails = showLogDetails === log.id ? null : log.id"
-                            class="inline-flex items-center px-2.5 py-1.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors duration-200"
+                            class="inline-flex items-center px-2.5 py-1.5 rounded text-xs font-medium bg-indigo-900/60 text-indigo-300 hover:bg-indigo-800/70 transition-colors duration-200"
                           >
                             {{ showLogDetails === log.id ? 'Hide Details' : 'View Details' }}
                           </button>
                         </td>
                       </tr>
-                      <tr v-if="showLogDetails === log.id" :key="`detail-${log.id}`" class="bg-gray-50">
+                      <tr v-if="showLogDetails === log.id" :key="`detail-${log.id}`" class="bg-gray-800">
                         <td colspan="4" class="px-6 py-4">
                           <div class="text-sm">
-                            <h4 class="font-medium text-gray-900 mb-3">Log Details</h4>
+                            <h4 class="font-medium text-gray-200 mb-3">Log Details</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                               <div>
-                                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Timestamp</p>
-                                <p class="text-sm">{{ formatLogTimestamp(log.timestamp) }}</p>
+                                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Timestamp</p>
+                                <p class="text-sm text-gray-300">{{ formatLogTimestamp(log.timestamp) }}</p>
                               </div>
                               <div>
-                                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Source</p>
-                                <p class="text-sm">{{ log.source }}</p>
+                                <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Source</p>
+                                <p class="text-sm text-gray-300">{{ log.source }}</p>
                               </div>
                             </div>
                             <div class="mb-4">
-                              <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Message</p>
-                              <p class="text-sm break-words bg-white p-3 rounded-md border border-gray-200">{{ log.message }}</p>
+                              <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Message</p>
+                              <p class="text-sm break-words bg-gray-900 p-3 rounded-md border border-gray-700 text-gray-300">{{ log.message }}</p>
                             </div>
                             <div>
-                              <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Payload</p>
-                              <pre class="text-xs bg-gray-900 text-gray-100 p-4 rounded-md overflow-x-auto shadow-sm">{{ JSON.stringify(log.json, null, 2) }}</pre>
+                              <p class="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Payload</p>
+                              <pre class="text-xs bg-gray-950 text-gray-300 p-4 rounded-md overflow-x-auto shadow-sm border border-gray-800">{{ JSON.stringify(log.json, null, 2) }}</pre>
                             </div>
                             <div class="mt-4 flex justify-end">
                               <button
                                 @click="showLogDetails = null"
-                                class="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+                                class="inline-flex items-center px-3 py-1.5 border border-gray-700 shadow-sm text-xs font-medium rounded-md text-gray-300 bg-gray-800 hover:bg-gray-700 transition-colors duration-200"
                               >
                                 Close
                               </button>
@@ -1125,12 +1125,12 @@
             </div>
             
             <!-- Empty State -->
-            <div v-else class="py-16 text-center bg-gray-50">
-              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-                <TerminalIcon class="h-8 w-8 text-gray-400" />
+            <div v-else class="py-16 text-center bg-gray-800">
+              <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-700 mb-4">
+                <TerminalIcon class="h-8 w-8 text-gray-500" />
               </div>
-              <h3 class="text-lg font-medium text-gray-900 mb-2">No logs available</h3>
-              <p class="text-gray-500 max-w-md mx-auto">
+              <h3 class="text-lg font-medium text-gray-200 mb-2">No logs available</h3>
+              <p class="text-gray-400 max-w-md mx-auto">
                 {{ vm && vm.status !== 'RUNNING' ? 'Start the VM to view logs' : 'No logs found for this VM' }}
               </p>
               <button
@@ -1146,11 +1146,11 @@
             </div>
 
             <!-- Load more logs -->
-            <div v-if="hasMoreLogs && vmLogs.length > 0" class="bg-white border-t border-gray-100 p-4 text-center">
+            <div v-if="hasMoreLogs && vmLogs.length > 0" class="bg-gray-900 border-t border-gray-800 p-4 text-center">
               <button
                 @click="loadVmLogs(true)"
                 :disabled="isLoadingLogs"
-                class="inline-flex items-center px-4 py-2 border border-indigo-200 rounded-md shadow-sm text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+                class="inline-flex items-center px-4 py-2 border border-indigo-700 rounded-md shadow-sm text-sm font-medium text-indigo-300 bg-indigo-900/40 hover:bg-indigo-800/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-700 focus:ring-offset-gray-900 transition-colors duration-200"
               >
                 <LoaderIcon v-if="isLoadingLogs" class="h-4 w-4 mr-1.5 animate-spin" />
                 <span v-else class="mr-1.5">+</span>

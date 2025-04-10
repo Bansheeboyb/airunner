@@ -61,10 +61,18 @@ export const getVmLogs = protectedProcedure
       const hardcodedInstanceId = "6576541849018811278";
       console.log("Using hardcoded instance ID:", hardcodedInstanceId);
       
-      // Use the hardcoded instance ID in the filter
-      let filter =
-        input.filter ||
-        `resource.type="gce_instance" AND resource.labels.instance_id="${hardcodedInstanceId}"`;
+      // Try multiple filter variations to ensure we get logs
+      // This simpler filter is exactly what works in the GCP logs explorer
+      // We'll try both string format and numeric format since GCP can sometimes treat instance IDs differently
+      let filter = `resource.type="gce_instance" AND (resource.labels.instance_id="${hardcodedInstanceId}" OR resource.labels.instance_id=${hardcodedInstanceId})`;
+      
+      // Also add a time restriction to focus on more recent logs
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const timeRestriction = `timestamp>="${oneWeekAgo.toISOString()}"`;
+      
+      // Add time restriction to filter
+      filter = `${filter} AND ${timeRestriction}`;
       
       // Log the filter for debugging
       console.log("Using filter with hardcoded instance ID:", filter);
@@ -82,32 +90,91 @@ export const getVmLogs = protectedProcedure
         version: "v2",
         auth: client,
       });
-
-      // Make the entries.list request
-      const response = await logging.entries.list({
+      
+      // Print debugging info about the API client
+      console.log("Authentication client created with scopes:", client.scopes);
+      console.log("Project ID being used:", projectId);
+      
+      // Create the request parameters
+      const requestParams = {
         resourceNames: [`projects/${projectId}`],
         filter,
         pageSize,
         pageToken,
         orderBy,
-      });
+      };
+      
+      console.log("Full API request parameters:", JSON.stringify(requestParams, null, 2));
+      
+      // Make the entries.list request
+      console.log("Calling Google Cloud Logging API...");
+      const response = await logging.entries.list(requestParams);
 
       // Process response
-      const entries = response.data.entries || [];
-      const nextPageToken = response.data.nextPageToken || null;
+      let entries = response.data.entries || [];
+      let nextPageToken = response.data.nextPageToken || null;
+      
+      // If we got no entries with the specific filter, try a broader filter as fallback
+      if (entries.length === 0) {
+        console.log("No entries found with specific filter, trying broader filter...");
+        
+        // Try a fallback filter that's more likely to return results
+        const fallbackFilter = `resource.type="gce_instance"`;
+        console.log("Using fallback filter:", fallbackFilter);
+        
+        try {
+          // Make a second request with the broader filter
+          const fallbackResponse = await logging.entries.list({
+            resourceNames: [`projects/${projectId}`],
+            filter: fallbackFilter,
+            pageSize,
+            pageToken,
+            orderBy,
+          });
+          
+          // Update with fallback results
+          const fallbackEntries = fallbackResponse.data.entries || [];
+          console.log(`Fallback filter returned ${fallbackEntries.length} log entries`);
+          
+          if (fallbackEntries.length > 0) {
+            entries = fallbackEntries;
+            nextPageToken = fallbackResponse.data.nextPageToken || null;
+            console.log("Using results from fallback filter");
+          }
+        } catch (fallbackError) {
+          console.error("Error with fallback filter:", fallbackError.message);
+        }
+      }
 
       console.log(`Fetched ${entries.length} log entries`);
+      
+      // Check API response even if entries is empty
+      console.log("API response status:", response.status);
+      console.log("API response headers:", response.headers);
+      console.log("Full API response data structure:", Object.keys(response.data));
       
       // More detailed logging to see what we're getting back
       if (entries.length > 0) {
         console.log("First log entry sample:", JSON.stringify(entries[0], null, 2));
+        console.log("Entry keys:", Object.keys(entries[0]));
+        
+        // Try to analyze what fields are available
+        const sampleEntry = entries[0] as Record<string, any>;
+        console.log("Sample entry - has resource:", !!sampleEntry.resource);
+        console.log("Sample entry - resource type:", sampleEntry.resource?.type);
+        console.log("Sample entry - labels:", JSON.stringify(sampleEntry.labels || {}));
+        console.log("Sample entry - resource labels:", JSON.stringify(sampleEntry.resource?.labels || {}));
       } else {
         console.log("No log entries found with the current filter");
+        
+        // Try a broader search to see if we can get any logs at all
+        console.log("Consider trying a broader filter like 'resource.type=\"gce_instance\"'");
       }
       
+      // Include more of the response data for debugging
       console.log(
         "Response data sample:",
-        JSON.stringify(response.data).substring(0, 500),
+        JSON.stringify(response.data).substring(0, 1000),
       );
 
       if (nextPageToken) {
@@ -162,8 +229,30 @@ export const getVmLogs = protectedProcedure
           projectId: process.env.GCP_PROJECT_ID,
           hasCredentials: !!process.env.GCP_PRIVATE_KEY && !!process.env.GCP_SERVICE_ACCOUNT_EMAIL,
           instanceId: "6576541849018811278", // The hardcoded ID we're using
-        }
+        },
+        possibleIssues: []
       };
+      
+      // Check for common error patterns and add helpful diagnostics
+      if (error.message?.includes("permission denied") || error.message?.includes("Permission denied")) {
+        errorInfo.possibleIssues.push("The service account lacks the required IAM roles. Make sure it has 'Logs Viewer' role.");
+      }
+      
+      if (error.message?.includes("not found")) {
+        errorInfo.possibleIssues.push("The specified project, instance ID, or resource may not exist.");
+      }
+      
+      if (error.message?.includes("invalid")) {
+        errorInfo.possibleIssues.push("The filter syntax might be invalid. Try simplifying it.");
+      }
+      
+      if (error.code === 403) {
+        errorInfo.possibleIssues.push("Access forbidden. Check service account permissions.");
+      }
+      
+      if (error.code === 401) {
+        errorInfo.possibleIssues.push("Authentication failed. Check that service account credentials are correct and valid.");
+      }
 
       console.error("Detailed error info:", JSON.stringify(errorInfo, null, 2));
       console.error("Error message:", error.message);

@@ -597,6 +597,8 @@
       // Refresh logs every 10 seconds
       logsAutoRefreshInterval.value = window.setInterval(() => {
         if (activeTab.value === "logs") {
+          // Reset page token for auto-refresh to avoid token mismatch errors
+          logPageToken.value = null;
           loadVmLogs();
         }
       }, 10000);
@@ -625,6 +627,7 @@
   const clearLogsFilter = () => {
     logSearchQuery.value = "";
     logFilter.value = "all";
+    logPageToken.value = null; // Reset page token when clearing filters
     loadVmLogs();
   };
   
@@ -1198,7 +1201,7 @@
                   <input
                     type="text"
                     v-model="logSearchQuery"
-                    @keyup.enter="loadVmLogs"
+                    @keyup.enter="logPageToken = null; loadVmLogs()"
                     placeholder="Search logs..."
                     class="pl-10 block w-full rounded-md bg-gray-800 border-gray-700 text-gray-300 placeholder-gray-500 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   />
@@ -1206,7 +1209,7 @@
                 <div class="flex gap-2">
                   <select
                     v-model="logFilter"
-                    @change="loadVmLogs"
+                    @change="logPageToken = null; loadVmLogs()"
                     class="rounded-md bg-gray-800 border-gray-700 text-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
                   >
                     <option v-for="option in logFilterOptions" :key="option.id" :value="option.id">

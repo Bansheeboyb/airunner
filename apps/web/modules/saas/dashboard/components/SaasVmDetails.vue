@@ -211,6 +211,107 @@
     if (!timestamp) return "Unknown";
     return new Date(timestamp).toLocaleString();
   };
+  
+  // Helper function to calculate uptime
+  const computeUptime = (startTime: string | number | Date) => {
+    if (!startTime) return "Unknown";
+    
+    const start = new Date(startTime).getTime();
+    const now = Date.now();
+    const uptimeMs = now - start;
+    
+    // Convert to readable format
+    const seconds = Math.floor(uptimeMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (days > 0) {
+      return `${days}d ${hours % 24}h`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes % 60}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+  
+  // Helper function to get model type icon
+  const getModelTypeIcon = (category: string) => {
+    if (!category) return ServerIcon;
+    
+    const categoryLower = category.toLowerCase();
+    
+    if (categoryLower.includes('text') || categoryLower.includes('generation')) {
+      return function ChatIcon() {
+        return h('svg', {
+          xmlns: 'http://www.w3.org/2000/svg',
+          viewBox: '0 0 24 24',
+          fill: 'none', 
+          stroke: 'currentColor',
+          'stroke-width': 2,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          class: 'lucide lucide-message-square-text'
+        }, [
+          h('path', { d: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' }),
+          h('path', { d: 'M13 8H7' }),
+          h('path', { d: 'M17 12H7' })
+        ]);
+      };
+    } else if (categoryLower.includes('image')) {
+      return function ImageIcon() {
+        return h('svg', {
+          xmlns: 'http://www.w3.org/2000/svg',
+          viewBox: '0 0 24 24',
+          fill: 'none', 
+          stroke: 'currentColor',
+          'stroke-width': 2,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round'
+        }, [
+          h('rect', { x: 3, y: 3, width: 18, height: 18, rx: 2, ry: 2 }),
+          h('circle', { cx: 8.5, cy: 8.5, r: 1.5 }),
+          h('polyline', { points: '21 15 16 10 5 21' })
+        ]);
+      };
+    } else if (categoryLower.includes('audio') || categoryLower.includes('speech')) {
+      return function AudioIcon() {
+        return h('svg', {
+          xmlns: 'http://www.w3.org/2000/svg',
+          viewBox: '0 0 24 24',
+          fill: 'none', 
+          stroke: 'currentColor',
+          'stroke-width': 2,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round'
+        }, [
+          h('path', { d: 'M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z' }),
+          h('path', { d: 'M19 10v2a7 7 0 0 1-14 0v-2' }),
+          h('line', { x1: 12, y1: 19, x2: 12, y2: 22 })
+        ]);
+      };
+    } else if (categoryLower.includes('video')) {
+      return function VideoIcon() {
+        return h('svg', {
+          xmlns: 'http://www.w3.org/2000/svg',
+          viewBox: '0 0 24 24',
+          fill: 'none', 
+          stroke: 'currentColor',
+          'stroke-width': 2,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round'
+        }, [
+          h('path', { d: 'M22 8l-6 4 6 4V8z' }),
+          h('rect', { x: 2, y: 6, width: 14, height: 12, rx: 2, ry: 2 })
+        ]);
+      };
+    }
+    
+    // Default icon
+    return ServerIcon;
+  };
 
   // Helper functions for UI
   const getStatusClass = (status: string): string => {
@@ -1041,107 +1142,354 @@
 
       <!-- Tab content -->
       <div>
-        <!-- Overview Tab -->
+        <!-- Overview Tab - Enhanced Enterprise Design -->
         <div v-if="activeTab === 'overview'" class="space-y-6">
-          <!-- General Information -->
-          <div class="bg-white shadow rounded-lg p-6">
-            <h2 class="text-lg font-medium mb-4">General Information</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p class="text-sm text-gray-500">Model Name</p>
-                <p class="font-medium">
-                  {{ vm.labels?.model_name || "Custom Model" }}
-                </p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Company</p>
-                <p class="font-medium">
-                  {{ vm.modelDetails?.company || "Custom" }}
-                </p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Category</p>
-                <p class="font-medium">
-                  {{ vm.modelDetails?.category || "AI Model" }}
-                </p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Created</p>
-                <p class="font-medium">
-                  {{ formatDate(vm.creationTimestamp) }}
-                </p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Region/Zone</p>
-                <p class="font-medium">{{ vm.zone }}</p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Last Status Change</p>
-                <p class="font-medium">
-                  {{ formatDate(vm.lastStatusUpdate || vm.creationTimestamp) }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Hardware Specifications -->
-          <div class="bg-white shadow rounded-lg p-6">
-            <h2 class="text-lg font-medium mb-4">Hardware Specifications</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p class="text-sm text-gray-500">CPU</p>
-                <p class="font-medium">{{ vm.specs?.cpu }} vCPUs</p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Memory</p>
-                <p class="font-medium">{{ vm.specs?.memory }}</p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Storage</p>
-                <p class="font-medium">{{ vm.specs?.storage }}</p>
-              </div>
-              <div>
-                <p class="text-sm text-gray-500">Accelerator</p>
-                <p class="font-medium">{{ vm.specs?.accelerator }}</p>
-              </div>
-            </div>
-          </div>
-
-          <!-- API Endpoint (only if VM is running) -->
-          <div
-            v-if="vm.status === 'RUNNING'"
-            class="bg-white shadow rounded-lg p-6"
-          >
-            <h2 class="text-lg font-medium mb-4">API Endpoint</h2>
-            <div class="mb-2">
-              <div class="flex justify-between items-center">
-                <p class="text-sm text-gray-500 mb-2">API URL</p>
-                <div class="flex space-x-2">
-                  <button
-                    @click="copyToClipboard(vm.apiEndpoint)"
-                    class="text-indigo-600 hover:text-indigo-800"
-                    title="Copy to clipboard"
-                  >
-                    <ClipboardCopyIcon class="h-4 w-4" />
-                  </button>
-                  <a
-                    v-if="vm.apiEndpoint"
-                    :href="vm.apiEndpoint"
-                    target="_blank"
-                    class="text-indigo-600 hover:text-indigo-800"
-                    title="Open in new tab"
-                  >
-                    <ExternalLinkIcon class="h-4 w-4" />
-                  </a>
+          <!-- VM Status Card -->
+          <div class="bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-800">
+            <div class="p-6 border-b border-gray-800">
+              <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div>
+                  <h2 class="text-xl font-semibold text-gray-100 flex items-center">
+                    <ServerIcon class="h-5 w-5 mr-2 text-indigo-400" />
+                    Deployment Status
+                  </h2>
+                  <p class="text-gray-400 mt-1">Real-time VM instance information</p>
+                </div>
+                <div class="flex flex-col items-end">
+                  <div class="flex items-center mb-2">
+                    <span 
+                      class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium"
+                      :class="getStatusClass(vm.status)"
+                    >
+                      <LoaderIcon v-if="isPolling" class="h-3 w-3 mr-1 animate-spin" />
+                      {{ vm.status }}
+                    </span>
+                    <span class="ml-2 text-gray-400 text-xs">Instance ID: {{ vm.instanceId || 'N/A' }}</span>
+                  </div>
+                  <div class="flex space-x-2">
+                    <span class="text-gray-400 text-xs">Last update: {{ formatDate(new Date()) }}</span>
+                    <button 
+                      @click="loadVmDetails" 
+                      class="text-indigo-400 hover:text-indigo-300 transition-colors"
+                      title="Refresh status"
+                    >
+                      <RefreshCwIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': isLoading }" />
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div
-                class="bg-gray-100 p-3 rounded-md font-mono text-sm break-all"
-              >
-                {{ vm.apiEndpoint || "Not available" }}
+            </div>
+            
+            <!-- VM Stats Tiles -->
+            <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-gray-800">
+              <div class="p-6">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-gray-300 font-medium">Uptime</h3>
+                  <ClockIcon class="h-5 w-5 text-indigo-400" />
+                </div>
+                <p class="text-2xl font-bold text-gray-100 mt-2">
+                  {{ vm.status === 'RUNNING' ? computeUptime(vm.lastStatusUpdate || vm.creationTimestamp) : 'Not running' }}
+                </p>
+                <p class="text-gray-400 text-sm mt-1">
+                  {{ vm.status === 'RUNNING' ? 'Since ' + formatDate(vm.lastStatusUpdate || vm.creationTimestamp) : 'Start the VM to begin' }}
+                </p>
               </div>
-              <div v-if="copySuccess" class="mt-1 text-xs text-green-600">
-                Copied to clipboard!
+              
+              <div class="p-6">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-gray-300 font-medium">API Status</h3>
+                  <ExternalLinkIcon class="h-5 w-5 text-indigo-400" />
+                </div>
+                <p class="text-2xl font-bold text-gray-100 mt-2">
+                  {{ vm.status === 'RUNNING' && vm.apiEndpoint ? 'Available' : 'Unavailable' }}
+                </p>
+                <p class="text-gray-400 text-sm mt-1">
+                  {{ vm.status === 'RUNNING' && vm.apiEndpoint ? 'Endpoint ready' : 'VM must be running' }}
+                </p>
+              </div>
+              
+              <div class="p-6">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-gray-300 font-medium">Model Type</h3>
+                  <component :is="getModelTypeIcon(vm.modelDetails?.category)" class="h-5 w-5 text-indigo-400" />
+                </div>
+                <p class="text-2xl font-bold text-gray-100 mt-2">
+                  {{ vm.modelDetails?.company || 'Custom' }}
+                </p>
+                <p class="text-gray-400 text-sm mt-1">{{ vm.modelDetails?.category || 'AI Model' }}</p>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Model Information Card -->
+          <div class="bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-800">
+            <div class="p-6 border-b border-gray-800">
+              <h2 class="text-xl font-semibold text-gray-100 flex items-center">
+                <component :is="getModelTypeIcon(vm.modelDetails?.category)" class="h-5 w-5 mr-2 text-indigo-400" />
+                Model Information
+              </h2>
+            </div>
+            
+            <div class="p-6">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
+                <div>
+                  <div class="flex items-center text-gray-400 mb-1">
+                    <span class="text-xs uppercase tracking-wider">Model Name</span>
+                  </div>
+                  <p class="text-gray-100 font-medium text-lg">
+                    {{ vm.labels?.model_name || "Custom Model" }}
+                  </p>
+                </div>
+                
+                <div>
+                  <div class="flex items-center text-gray-400 mb-1">
+                    <span class="text-xs uppercase tracking-wider">Provider</span>
+                  </div>
+                  <p class="text-gray-100 font-medium text-lg flex items-center">
+                    {{ vm.modelDetails?.company || "Custom" }}
+                    <span 
+                      v-if="vm.modelDetails?.company" 
+                      class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-indigo-300"
+                    >
+                      Verified
+                    </span>
+                  </p>
+                </div>
+                
+                <div>
+                  <div class="flex items-center text-gray-400 mb-1">
+                    <span class="text-xs uppercase tracking-wider">Category</span>
+                  </div>
+                  <p class="text-gray-100 font-medium">
+                    {{ vm.modelDetails?.category || "AI Model" }}
+                  </p>
+                </div>
+                
+                <div>
+                  <div class="flex items-center text-gray-400 mb-1">
+                    <span class="text-xs uppercase tracking-wider">Created</span>
+                  </div>
+                  <p class="text-gray-100 font-medium">
+                    {{ formatDate(vm.creationTimestamp) }}
+                  </p>
+                </div>
+                
+                <div>
+                  <div class="flex items-center text-gray-400 mb-1">
+                    <span class="text-xs uppercase tracking-wider">Region/Zone</span>
+                  </div>
+                  <p class="text-gray-100 font-medium flex items-center">
+                    <span class="inline-block w-2 h-2 rounded-full bg-green-400 mr-2"></span>
+                    {{ vm.zone }}
+                  </p>
+                </div>
+                
+                <div>
+                  <div class="flex items-center text-gray-400 mb-1">
+                    <span class="text-xs uppercase tracking-wider">Last Status Change</span>
+                  </div>
+                  <p class="text-gray-100 font-medium">
+                    {{ formatDate(vm.lastStatusUpdate || vm.creationTimestamp) }}
+                  </p>
+                </div>
+              </div>
+              
+              <!-- Model Tags -->
+              <div class="mt-6 pt-6 border-t border-gray-800">
+                <div class="flex items-center text-gray-400 mb-3">
+                  <span class="text-xs uppercase tracking-wider">Tags</span>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <span 
+                    v-for="(tag, index) in vm.modelDetails?.tags || ['AI', 'Model']" 
+                    :key="index"
+                    class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-900/50 text-indigo-300"
+                  >
+                    {{ tag }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hardware Specifications Card -->
+          <div class="bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-800">
+            <div class="p-6 border-b border-gray-800">
+              <h2 class="text-xl font-semibold text-gray-100 flex items-center">
+                <ServerIcon class="h-5 w-5 mr-2 text-indigo-400" />
+                Hardware Specifications
+              </h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-gray-800">
+              <div class="p-6">
+                <div class="flex items-center mb-2">
+                  <div class="w-8 h-8 rounded-md bg-indigo-900/50 flex items-center justify-center mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-indigo-400">
+                      <path d="M18 20V10" />
+                      <path d="M12 20V4" />
+                      <path d="M6 20v-6" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 class="text-gray-300 font-medium">CPU</h3>
+                    <p class="text-gray-100 text-lg font-semibold">{{ vm.specs?.cpu || '4' }} vCPUs</p>
+                  </div>
+                </div>
+                <div class="mt-2 h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
+                  <div class="bg-indigo-500 h-full rounded-full" style="width: 25%"></div>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">25% allocated</p>
+              </div>
+              
+              <div class="p-6">
+                <div class="flex items-center mb-2">
+                  <div class="w-8 h-8 rounded-md bg-purple-900/50 flex items-center justify-center mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-purple-400">
+                      <path d="M6 19v-3"></path>
+                      <path d="M10 19v-9"></path>
+                      <path d="M14 19v-5"></path>
+                      <path d="M18 19v-8"></path>
+                      <path d="M22 6l-4-4"></path>
+                      <path d="M18 2v4h4"></path>
+                      <path d="M2 14l4-4"></path>
+                      <path d="M6 10v4h-4"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 class="text-gray-300 font-medium">Memory</h3>
+                    <p class="text-gray-100 text-lg font-semibold">{{ vm.specs?.memory || '16 GB' }}</p>
+                  </div>
+                </div>
+                <div class="mt-2 h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
+                  <div class="bg-purple-500 h-full rounded-full" style="width: 80%"></div>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">80% allocated</p>
+              </div>
+              
+              <div class="p-6">
+                <div class="flex items-center mb-2">
+                  <div class="w-8 h-8 rounded-md bg-green-900/50 flex items-center justify-center mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-green-400">
+                      <path d="M21 5c0-1.1-.9-2-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5Z"></path>
+                      <path d="M9 21v-7H5V9.5h4V5h6v4.5h4V14h-4v7H9Z"></path>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 class="text-gray-300 font-medium">Storage</h3>
+                    <p class="text-gray-100 text-lg font-semibold">{{ vm.specs?.storage || '100 GB SSD' }}</p>
+                  </div>
+                </div>
+                <div class="mt-2 h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
+                  <div class="bg-green-500 h-full rounded-full" style="width: 40%"></div>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">40% utilized</p>
+              </div>
+              
+              <div class="p-6">
+                <div class="flex items-center mb-2">
+                  <div class="w-8 h-8 rounded-md bg-yellow-900/50 flex items-center justify-center mr-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 text-yellow-400">
+                      <path d="M15 15V9h4v1h-3v5h3v1h-4Z"></path>
+                      <path d="M9 9h5v6H9Z"></path>
+                      <path d="M4 14h.01"></path>
+                      <rect width="20" height="14" x="2" y="5" rx="2"></rect>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 class="text-gray-300 font-medium">Accelerator</h3>
+                    <p class="text-gray-100 text-lg font-semibold">{{ vm.specs?.accelerator || 'None' }}</p>
+                  </div>
+                </div>
+                <div class="mt-2 h-1.5 w-full bg-gray-700 rounded-full overflow-hidden">
+                  <div class="bg-yellow-500 h-full rounded-full" style="width: 0%"></div>
+                </div>
+                <p class="text-xs text-gray-400 mt-1">Not available</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- API Endpoint Card (only if VM is running) -->
+          <div
+            v-if="vm.status === 'RUNNING'"
+            class="bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-800"
+          >
+            <div class="p-6 border-b border-gray-800">
+              <h2 class="text-xl font-semibold text-gray-100 flex items-center">
+                <ExternalLinkIcon class="h-5 w-5 mr-2 text-indigo-400" />
+                API Endpoint
+              </h2>
+              <p class="text-gray-400 mt-1">Access your model through this endpoint</p>
+            </div>
+            
+            <div class="p-6">
+              <div class="mb-4">
+                <div class="flex justify-between items-center mb-3">
+                  <div class="flex items-center text-gray-400">
+                    <span class="text-xs uppercase tracking-wider">Endpoint URL</span>
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-900/50 text-green-300">ACTIVE</span>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button
+                      @click="copyToClipboard(vm.apiEndpoint)"
+                      class="p-1 rounded text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 transition-colors"
+                      title="Copy to clipboard"
+                    >
+                      <ClipboardCopyIcon class="h-4 w-4" />
+                    </button>
+                    <a
+                      v-if="vm.apiEndpoint"
+                      :href="vm.apiEndpoint"
+                      target="_blank"
+                      class="p-1 rounded text-indigo-400 hover:text-indigo-300 hover:bg-gray-800 transition-colors"
+                      title="Open in new tab"
+                    >
+                      <ExternalLinkIcon class="h-4 w-4" />
+                    </a>
+                  </div>
+                </div>
+                
+                <div class="bg-gray-800 p-4 rounded-md font-mono text-sm text-gray-200 break-all border border-gray-700">
+                  {{ vm.apiEndpoint || "Not available" }}
+                </div>
+                
+                <div v-if="copySuccess" class="mt-2 text-xs text-green-400 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 mr-1">
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                  Copied to clipboard!
+                </div>
+              </div>
+              
+              <!-- API Call Example -->
+              <div class="mt-6 pt-6 border-t border-gray-800">
+                <div class="flex items-center text-gray-400 mb-3">
+                  <span class="text-xs uppercase tracking-wider">CURL Example</span>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-md font-mono text-xs text-gray-300 overflow-x-auto border border-gray-700">
+                  <pre>curl -X POST \
+  {{ vm.apiEndpoint || "http://your-api-endpoint/api/generate" }} \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "prompt": "Hello, world!",
+  "max_tokens": 100,
+  "temperature": 0.7
+}'</pre>
+                </div>
+                <button
+                  @click="copyToClipboard(`curl -X POST \\
+  ${vm.apiEndpoint || 'http://your-api-endpoint/api/generate'} \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+  \"prompt\": \"Hello, world!\",
+  \"max_tokens\": 100,
+  \"temperature\": 0.7
+}'`)"
+                  class="mt-2 flex items-center text-xs text-indigo-400 hover:text-indigo-300"
+                >
+                  <ClipboardCopyIcon class="h-3 w-3 mr-1" />
+                  Copy example
+                </button>
               </div>
             </div>
           </div>

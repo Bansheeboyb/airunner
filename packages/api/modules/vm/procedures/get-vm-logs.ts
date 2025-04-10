@@ -99,12 +99,12 @@ export const getVmLogs = protectedProcedure
         };
       });
 
-      const response: VMLogsResponse = {
+      const result: VMLogsResponse = {
         logs: processedEntries,
         nextPageToken,
       };
       
-      return response;
+      return result;
     } catch (error) {
       console.error("Error fetching VM logs:", error);
 

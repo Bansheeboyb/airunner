@@ -105,8 +105,7 @@ export const getVmLogs = protectedProcedure
       };
       
       return response;
-    } catch (err) {
-      const error = err as Error & { response?: { status: number; data: any } };
+    } catch (error) {
       console.error("Error fetching VM logs:", error);
 
       // More detailed error logging
@@ -114,6 +113,13 @@ export const getVmLogs = protectedProcedure
         console.error("Response status:", error.response.status);
         console.error("Response data:", JSON.stringify(error.response.data));
       }
+
+      if (error.request) {
+        console.error("Request was made but no response received");
+      }
+
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
 
       throw new Error(`Error fetching logs: ${error.message}`);
     }

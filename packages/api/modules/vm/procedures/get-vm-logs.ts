@@ -9,6 +9,7 @@ export const getVmLogs = protectedProcedure
     z.object({
       vmName: z.string(),
       zone: z.string(),
+      instanceId: z.string().optional(), // Add this to accept numeric instance ID
       filter: z.string().optional(),
       limit: z.number().default(100),
       pageToken: z.string().optional(),
@@ -18,7 +19,7 @@ export const getVmLogs = protectedProcedure
   .query(async ({ input }) => {
     try {
       console.log("Starting VM logs fetch for:", input.vmName);
-      const { vmName, zone, pageToken, limit } = input;
+      const { vmName, zone, pageToken, limit, instanceId } = input;
       const pageSize = Math.min(limit, 1000); // Max 1000 entries per request
       const zoneStr = zone.includes("-") ? zone : `${zone}-a`;
 
@@ -37,7 +38,6 @@ export const getVmLogs = protectedProcedure
         console.error("Missing GCP credentials in environment variables");
 
         // In development, return mock data instead of failing
-        // This allows the app to work without real GCP credentials during development
         if (process.env.NODE_ENV === "development") {
           console.log(
             "Using mock log data for development environment (GCP credentials not available)",
@@ -57,12 +57,18 @@ export const getVmLogs = protectedProcedure
         scopes: ["https://www.googleapis.com/auth/cloud-platform"],
       });
 
-      // Define the filter for Logging API
+      // Improved filter that tries multiple possible instance identifiers
       let filter =
         input.filter ||
-        `resource.type="gce_instance" 
-   AND resource.labels.instance_id="${vmName}"
-   OR labels.model_name="${vmName.replace("llm-", "")}"`;
+        `resource.type="gce_instance" AND (resource.labels.instance_id="${vmName}"`;
+
+      // Add instanceId to filter if provided
+      if (instanceId) {
+        filter += ` OR resource.labels.instance_id="${instanceId}"`;
+      }
+
+      // Add additional possible filter conditions
+      filter += ` OR labels.instance_name="${vmName}")`;
 
       // Define the order by clause (default to timestamp desc)
       const orderBy = input.orderBy || "timestamp desc";
@@ -70,6 +76,7 @@ export const getVmLogs = protectedProcedure
       console.log("Fetching logs with filter:", filter);
       console.log("Page size:", pageSize);
       console.log("Page token:", pageToken);
+      console.log("Instance ID (if provided):", instanceId);
 
       // Use Logging API to fetch logs
       const logging = google.logging({
@@ -91,6 +98,11 @@ export const getVmLogs = protectedProcedure
       const nextPageToken = response.data.nextPageToken || null;
 
       console.log(`Fetched ${entries.length} log entries`);
+      console.log(
+        "Response data sample:",
+        JSON.stringify(response.data).substring(0, 500),
+      );
+
       if (nextPageToken) {
         console.log("More logs available with next page token");
       }
@@ -136,7 +148,6 @@ export const getVmLogs = protectedProcedure
       console.error("Error stack:", error.stack);
 
       // In development, return mock data instead of failing
-      // This allows the app to work without real GCP credentials during development
       if (process.env.NODE_ENV === "development") {
         console.log(
           "Error occurred, using mock log data for development environment",

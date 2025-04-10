@@ -35,6 +35,14 @@ export const getVmLogs = protectedProcedure
         !process.env.GCP_PROJECT_ID
       ) {
         console.error("Missing GCP credentials in environment variables");
+        
+        // In development, return mock data instead of failing
+        // This allows the app to work without real GCP credentials during development
+        if (process.env.NODE_ENV === 'development') {
+          console.log("Using mock log data for development environment (GCP credentials not available)");
+          return createMockLogResponse(vmName, limit, pageToken);
+        }
+        
         throw new Error("Invalid or missing GCP credentials");
       }
 
@@ -120,6 +128,13 @@ export const getVmLogs = protectedProcedure
 
       console.error("Error message:", error.message);
       console.error("Error stack:", error.stack);
+      
+      // In development, return mock data instead of failing
+      // This allows the app to work without real GCP credentials during development
+      if (process.env.NODE_ENV === 'development') {
+        console.log("Error occurred, using mock log data for development environment");
+        return createMockLogResponse(vmName, limit, pageToken);
+      }
 
       throw new Error(`Error fetching logs: ${error.message}`);
     }
@@ -148,4 +163,80 @@ function extractMessage(entry: Record<string, any>): string {
   }
   
   return "No message available";
+}
+
+// Helper function to create mock log response data
+function createMockLogResponse(vmName: string, limit: number = 100, pageToken?: string): VMLogsResponse {
+  // Create some realistic log entries
+  const mockSeverities = ["INFO", "WARNING", "ERROR", "DEBUG", "NOTICE"];
+  const mockMessages = [
+    "Starting VM instance",
+    "Downloading model files",
+    "Initializing runtime environment",
+    "Configuring network interfaces",
+    "Loading model weights into memory",
+    "Model loaded successfully",
+    "Starting inference API server",
+    "API server listening on port 8080",
+    "Health check passed",
+    "Processing inference request",
+    "Request processed in 245ms",
+    "High memory usage detected (85%)",
+    "Rate limiting applied to incoming requests",
+    "Connection from unauthorized IP blocked",
+    "New client connection established"
+  ];
+
+  // Create random timestamps within the last hour
+  const now = Date.now();
+  
+  // Create mock log entries
+  const mockLogs: VMLogEntry[] = [];
+  const pageSize = Math.min(limit, 100);
+  
+  // If there's a page token, use it to determine offset (simple implementation)
+  const startIndex = pageToken ? parseInt(pageToken, 10) : 0;
+  
+  for (let i = 0; i < pageSize; i++) {
+    const entryIndex = startIndex + i;
+    const randomTimestamp = new Date(now - (entryIndex * 60000) - Math.random() * 3600000);
+    const severity = mockSeverities[Math.floor(Math.random() * mockSeverities.length)];
+    const message = mockMessages[Math.floor(Math.random() * mockMessages.length)];
+    
+    mockLogs.push({
+      timestamp: randomTimestamp.toISOString(),
+      severity: severity,
+      message: message,
+      textPayload: message,
+      jsonPayload: {
+        message: message,
+        vmName: vmName,
+        serviceName: "vm-agent",
+        requestId: `req-${Math.random().toString(36).substring(2, 10)}`,
+      },
+      resource: {
+        type: "gce_instance",
+        labels: {
+          instance_id: vmName,
+          zone: "us-central1-a",
+          project_id: "mock-project"
+        }
+      },
+      source: vmName,
+      insertId: `mock-log-${entryIndex}`,
+      labels: {
+        environment: "development"
+      },
+      trace: `projects/mock-project/traces/${Math.random().toString(36).substring(2, 15)}`
+    });
+  }
+  
+  // Create next page token if we have more logs
+  const hasMoreLogs = startIndex + pageSize < 500; // Pretend we have 500 logs total
+  const nextPageToken = hasMoreLogs ? (startIndex + pageSize).toString() : null;
+  
+  return {
+    logs: mockLogs,
+    nextPageToken
+  };
 }

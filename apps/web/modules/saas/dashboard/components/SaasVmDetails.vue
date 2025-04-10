@@ -473,36 +473,22 @@
         return;
       }
       
-      // Make API call to your backend, which will fetch from GCP Cloud Logging
+      // Always use mock data in development mode since GCP credentials might not be available
+      // This provides a consistent experience in development without requiring real GCP credentials
+      if (process.env.NODE_ENV === 'development') {
+        console.warn("Using mock data for development environment");
+        mockVmLogs();
+        isLoadingLogs.value = false;
+        return;
+      }
+      
+      // In production, try to use the real API endpoint
       let response;
       try {
-        // Try to use the real API endpoint
         response = await apiCaller.vm.getVmLogs.query(params);
       } catch (apiError) {
         console.error("API endpoint not available:", apiError);
-        
-        // Fallback to direct GCP Cloud Logging fetch if your backend supports it
-        // This is typically handled on the backend due to authentication requirements
-        try {
-          // This is a placeholder for direct GCP API connection 
-          // In real implementation, this would need GCP credentials configured
-          
-          // Since direct fetch is likely not possible from frontend, use mock data in development
-          if (process.env.NODE_ENV === 'development') {
-            throw new Error("Using mock data in development");
-          } else {
-            throw new Error("Log API not implemented");
-          }
-        } catch (gcpError) {
-          if (process.env.NODE_ENV === 'development') {
-            console.warn("Using mock data for development");
-            mockVmLogs();
-            isLoadingLogs.value = false;
-            return;
-          } else {
-            throw gcpError; // Re-throw in production
-          }
-        }
+        throw new Error("Unable to fetch logs from the server. Please check GCP credentials.");
       }
       
       // Transform logs for display

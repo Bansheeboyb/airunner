@@ -414,7 +414,7 @@
     { id: "debug", label: "Debug" },
   ];
   
-  // Load logs
+  // Load logs from GCP Cloud Logging
   const loadVmLogs = async (loadMore = false) => {
     if (!vm.value) return;
     
@@ -428,17 +428,82 @@
     try {
       const { vmName, zone } = getVmNameAndZone();
       
-      const params: any = {
+      // Build GCP compatible log filter
+      let filterString = `resource.type="gce_instance" resource.labels.instance_id="${vmName}"`;
+      
+      // Add severity filter if specified
+      if (logFilter.value !== "all") {
+        filterString += ` severity=${logFilter.value.toUpperCase()}`;
+      }
+      
+      // Add text search if provided
+      if (logSearchQuery.value) {
+        filterString += ` textPayload:"${logSearchQuery.value}" OR jsonPayload:"${logSearchQuery.value}"`;
+      }
+      
+      const params = {
         vmName,
         zone,
+        filter: filterString,
         limit: logsLimit.value,
-        filter: logFilter.value !== "all" ? logFilter.value : undefined,
-        search: logSearchQuery.value || undefined,
-        pageToken: loadMore ? logPageToken.value : undefined
+        pageToken: loadMore ? logPageToken.value : undefined,
+        orderBy: "timestamp desc" // Most recent logs first
       };
       
-      // This would be the actual API call to get logs
-      const response = await apiCaller.vm.getVmLogs.query(params);
+      // Check if the VM is running before proceeding
+      if (vm.value.status !== "RUNNING") {
+        // If VM is not running, show a clear message 
+        if (!vmLogs.value.length) {
+          // Only use mock data in development and if the VM is not running
+          if (process.env.NODE_ENV === 'development') {
+            mockVmLogs();
+          } else {
+            vmLogs.value = [{
+              id: 0,
+              timestamp: new Date().toISOString(),
+              severity: "INFO",
+              message: "VM is not running. Start the VM to view actual logs.",
+              json: {},
+              source: vmName,
+              raw: {}
+            }];
+          }
+        }
+        isLoadingLogs.value = false;
+        return;
+      }
+      
+      // Make API call to your backend, which will fetch from GCP Cloud Logging
+      let response;
+      try {
+        // Try to use the real API endpoint
+        response = await apiCaller.vm.getVmLogs.query(params);
+      } catch (apiError) {
+        console.error("API endpoint not available:", apiError);
+        
+        // Fallback to direct GCP Cloud Logging fetch if your backend supports it
+        // This is typically handled on the backend due to authentication requirements
+        try {
+          // This is a placeholder for direct GCP API connection 
+          // In real implementation, this would need GCP credentials configured
+          
+          // Since direct fetch is likely not possible from frontend, use mock data in development
+          if (process.env.NODE_ENV === 'development') {
+            throw new Error("Using mock data in development");
+          } else {
+            throw new Error("Log API not implemented");
+          }
+        } catch (gcpError) {
+          if (process.env.NODE_ENV === 'development') {
+            console.warn("Using mock data for development");
+            mockVmLogs();
+            isLoadingLogs.value = false;
+            return;
+          } else {
+            throw gcpError; // Re-throw in production
+          }
+        }
+      }
       
       // Transform logs for display
       const transformedLogs = (response.logs || []).map((log: any, index: number) => {
@@ -468,7 +533,7 @@
       logsError.value = `Error loading logs: ${err instanceof Error ? err.message : String(err)}`;
       
       // For development - mock some logs when the API is not available
-      if (!vmLogs.value.length) {
+      if (!vmLogs.value.length && process.env.NODE_ENV === 'development') {
         mockVmLogs();
       }
     } finally {
@@ -554,59 +619,168 @@
     }
   };
   
-  // For development - create mock logs
+  // For development - create realistic GCP-like mock logs
   const mockVmLogs = () => {
-    const severities = ["INFO", "WARNING", "ERROR", "DEBUG"];
-    const actions = [
-      "VM instance started",
-      "Loading model into memory",
-      "Model loaded successfully",
-      "API server starting",
-      "API server started on port 8080",
-      "Received request for model inference",
-      "Processed request in 245ms",
-      "Failed to load configuration",
-      "Out of memory error when loading large tensor",
-      "Rate limiting applied to incoming requests",
-      "Health check passed",
-      "System utilization at 75%",
-      "Garbage collection triggered",
-      "Updating model weights",
-      "Downloading model updates",
-      "Connection from unauthorized IP blocked",
+    // Model-specific actions based on VM labels
+    const modelName = vm.value?.labels?.model_name || "unknown-model";
+    const modelType = modelName.includes("llama") || modelName.includes("claude") || modelName.includes("gemini") 
+                     ? "LLM" 
+                     : modelName.includes("diffusion") || modelName.includes("dall") 
+                     ? "Image Generation" 
+                     : "AI Model";
+    
+    // GCP log levels
+    const severities = ["INFO", "WARNING", "ERROR", "DEBUG", "NOTICE"];
+    
+    // Generate appropriate actions based on model type
+    const bootActions = [
+      { severity: "INFO", message: "Starting VM instance" },
+      { severity: "INFO", message: `Downloading ${modelName} model files` },
+      { severity: "INFO", message: "Initializing runtime environment" },
+      { severity: "INFO", message: "Configuring network interfaces" },
+      { severity: "INFO", message: "Preparing storage volumes" },
+      { severity: "INFO", message: "Starting container services" },
+      { severity: "INFO", message: `Initializing ${modelType} runtime` },
+    ];
+    
+    const llmSpecificActions = [
+      { severity: "INFO", message: "Loading model weights into memory" },
+      { severity: "INFO", message: "Model loaded successfully" },
+      { severity: "INFO", message: "Starting inference API server" },
+      { severity: "INFO", message: "API server listening on port 8080" },
+      { severity: "INFO", message: "Health check passed" },
+      { severity: "DEBUG", message: "Tokenizer initialized with vocabulary size 32000" },
+      { severity: "INFO", message: "Model serving ready on 0.0.0.0:8080" },
+    ];
+    
+    const errorActions = [
+      { severity: "WARNING", message: "High memory usage detected (85%)" },
+      { severity: "WARNING", message: "Rate limiting applied to incoming requests" },
+      { severity: "ERROR", message: "Failed to load configuration file at /etc/model-config.json" },
+      { severity: "ERROR", message: "Out of memory error when loading large tensor batch" },
+      { severity: "ERROR", message: "API request timed out after 30 seconds" },
+      { severity: "WARNING", message: "Slow disk I/O detected - check storage performance" },
+      { severity: "ERROR", message: "Connection refused to metadata service" },
+    ];
+    
+    const runtimeActions = [
+      { severity: "INFO", message: "Processing inference request" },
+      { severity: "INFO", message: "Request processed in 245ms" },
+      { severity: "DEBUG", message: "Input tokens: 124, Output tokens: 356" },
+      { severity: "DEBUG", message: "Batch size: 4, Sequence length: 512" },
+      { severity: "INFO", message: "Garbage collection triggered" },
+      { severity: "INFO", message: "System utilization at 75%" },
+      { severity: "INFO", message: "New client connection established" },
+      { severity: "INFO", message: "Connection from 203.0.113.42 accepted" },
+      { severity: "WARNING", message: "Connection from unauthorized IP 198.51.100.123 blocked" },
+      { severity: "INFO", message: "Serving model parameters: temperature=0.7, top_p=0.95" },
+    ];
+    
+    // Combine all possible actions with appropriate weighting
+    const allActions = [
+      ...bootActions,
+      ...llmSpecificActions,
+      ...Array(15).fill(0).flatMap(() => runtimeActions), // More runtime logs
+      ...Array(3).fill(0).flatMap(() => errorActions),    // Fewer error logs
     ];
     
     const mockLogs = [];
+    const now = Date.now();
+    const vmStartTime = now - 3600000; // VM started 1 hour ago
     
-    // Generate 50 random logs with timestamps spreading over the last day
-    for (let i = 0; i < 50; i++) {
-      const timestamp = new Date(Date.now() - Math.random() * 86400000).toISOString();
-      const severity = severities[Math.floor(Math.random() * severities.length)];
-      const action = actions[Math.floor(Math.random() * actions.length)];
-      
-      mockLogs.push({
-        id: i,
-        timestamp,
-        severity,
-        message: `[${vm.value?.name}] ${action}`,
-        source: vm.value?.name || 'vm',
-        json: { 
-          vm: vm.value?.name,
-          action,
-          details: {
-            resourceId: `projects/my-project/zones/${vm.value?.zone}/instances/${vm.value?.name}`,
-            ipAddress: "10.0.0." + Math.floor(Math.random() * 255)
-          }
-        },
-        raw: {}
-      });
+    // Generate boot sequence logs
+    bootActions.forEach((action, i) => {
+      const bootTime = vmStartTime + (i * 5000); // 5 seconds between boot steps
+      mockLogs.push(createMockLog(action, bootTime, i));
+    });
+    
+    // Generate 50 more random logs
+    for (let i = bootActions.length; i < 50 + bootActions.length; i++) {
+      const randomAction = allActions[Math.floor(Math.random() * allActions.length)];
+      const timestamp = now - Math.random() * 3600000; // Past hour
+      mockLogs.push(createMockLog(randomAction, timestamp, i));
     }
     
-    // Sort by timestamp descending
+    // Add a few very recent logs
+    for (let i = 0; i < 5; i++) {
+      const randomAction = runtimeActions[Math.floor(Math.random() * runtimeActions.length)];
+      const recentTime = now - (i * 10000); // Last 50 seconds
+      mockLogs.push(createMockLog(randomAction, recentTime, mockLogs.length));
+    }
+    
+    // Sort by timestamp descending (newest first)
     mockLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
     
     vmLogs.value = mockLogs;
     hasMoreLogs.value = true;
+    
+    // Helper to create a mock log with GCP-like structure
+    function createMockLog(action, timestampMs, id) {
+      const timestamp = new Date(timestampMs).toISOString();
+      const insertId = crypto.randomUUID ? crypto.randomUUID() : `mock-log-${id}-${Date.now()}`;
+      const traceId = `projects/airunner/traces/${Math.random().toString(36).substring(2, 15)}`;
+      
+      // Create resource and labels similar to GCP
+      const resource = {
+        type: "gce_instance",
+        labels: {
+          instance_id: vm.value?.name || "unknown",
+          zone: vm.value?.zone || "us-central1-a",
+          project_id: "airunner"
+        }
+      };
+      
+      // Generate realistic json payload
+      const jsonPayload = {
+        message: action.message,
+        serviceName: "airunner-vm-agent",
+        model: modelName,
+        instanceName: vm.value?.name,
+        hostname: `${vm.value?.name || "vm"}.c.airunner.internal`,
+      };
+      
+      // Add request details for runtime logs
+      if (action.message.includes("Processing") || action.message.includes("Request processed")) {
+        jsonPayload.request = {
+          id: `req-${Math.random().toString(36).substring(2, 10)}`,
+          method: "POST",
+          path: "/v1/completions",
+          clientIp: `203.0.113.${Math.floor(Math.random() * 255)}`,
+          processingTimeMs: Math.floor(100 + Math.random() * 500),
+        };
+      }
+      
+      // Add error details for error logs
+      if (action.severity === "ERROR") {
+        jsonPayload.error = {
+          code: Math.floor(Math.random() * 5) + 1,
+          stack: `Error: ${action.message}\n    at processRequest (/app/server.js:142:23)\n    at async handleAPIRequest (/app/server.js:89:12)`,
+        };
+      }
+      
+      return {
+        id,
+        insertId,
+        timestamp,
+        severity: action.severity,
+        message: action.message,
+        json: jsonPayload,
+        source: resource.labels.instance_id,
+        traceId,
+        resource,
+        raw: {
+          insertId,
+          timestamp,
+          severity: action.severity,
+          textPayload: action.message,
+          jsonPayload,
+          resource,
+          logName: `projects/airunner/logs/vm-${resource.labels.instance_id}`,
+          receiveTimestamp: new Date(timestampMs + 50).toISOString(), // Slight delay for receive vs event time
+          trace: traceId,
+        }
+      };
+    }
   };
   
   // Watch for tab changes to load logs when needed

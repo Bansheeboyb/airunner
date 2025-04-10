@@ -2,7 +2,7 @@ import { z } from "zod";
 import { protectedProcedure } from "../../trpc";
 import { JWT } from "google-auth-library";
 import { google } from "googleapis";
-import { VMLogEntry, VMLogsResponse, VMLogsRequest } from "../types";
+import { VMLogEntry, VMLogsResponse } from "../types";
 
 export const getVmLogs = protectedProcedure
   .input(
@@ -82,18 +82,22 @@ export const getVmLogs = protectedProcedure
       }
 
       // Transform log entries for frontend consumption
-      const processedEntries: VMLogEntry[] = entries.map((entry: any) => ({
-        timestamp: entry.timestamp || new Date().toISOString(),
-        severity: entry.severity || "DEFAULT",
-        message: extractMessage(entry),
-        textPayload: entry.textPayload,
-        jsonPayload: entry.jsonPayload,
-        resource: entry.resource,
-        source: entry.resource?.labels?.instance_id || vmName,
-        insertId: entry.insertId,
-        labels: entry.labels,
-        trace: entry.trace,
-      }));
+      const processedEntries: VMLogEntry[] = entries.map((entry) => {
+        // Use type casting to handle GCP logging entry
+        const logEntry = entry as Record<string, any>;
+        return {
+          timestamp: logEntry.timestamp || new Date().toISOString(),
+          severity: logEntry.severity || "DEFAULT",
+          message: extractMessage(logEntry),
+          textPayload: logEntry.textPayload,
+          jsonPayload: logEntry.jsonPayload || {},
+          resource: logEntry.resource || {},
+          source: logEntry.resource?.labels?.instance_id || vmName,
+          insertId: logEntry.insertId,
+          labels: logEntry.labels || {},
+          trace: logEntry.trace,
+        };
+      });
 
       const response: VMLogsResponse = {
         logs: processedEntries,
@@ -101,7 +105,8 @@ export const getVmLogs = protectedProcedure
       };
       
       return response;
-    } catch (error) {
+    } catch (err) {
+      const error = err as Error & { response?: { status: number; data: any } };
       console.error("Error fetching VM logs:", error);
 
       // More detailed error logging
@@ -115,7 +120,7 @@ export const getVmLogs = protectedProcedure
   });
 
 // Helper function to extract the primary message from a log entry
-function extractMessage(entry: any): string {
+function extractMessage(entry: Record<string, any>): string {
   // Try to get message from jsonPayload (most common)
   if (entry.jsonPayload && entry.jsonPayload.message) {
     return entry.jsonPayload.message;

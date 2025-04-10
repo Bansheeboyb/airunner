@@ -17,7 +17,8 @@
     "stripe": "^17.5.0",
     "tsconfig": "workspace:*",
     "ufo": "^1.5.4",
-    "utils": "workspace:*"
+    "utils": "workspace:*",
+    "googleapis": "^110.0.0"
   },
   "devDependencies": {
     "eslint": "8.57.0",

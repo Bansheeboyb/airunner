@@ -11,8 +11,16 @@
     TerminalIcon,
     ActivityIcon,
     RefreshCwIcon,
+    SearchIcon,
+    DownloadIcon,
+    FilterIcon,
+    XIcon,
+    AlertCircleIcon,
+    InfoIcon,
+    CheckCircleIcon,
+    ClockIcon,
   } from "lucide-vue-next";
-  import { ref, onMounted, computed, onUnmounted } from "vue";
+  import { ref, onMounted, computed, onUnmounted, watch } from "vue";
 
   const props = defineProps<{
     vmId: string;
@@ -384,19 +392,235 @@
     emit("back");
   };
 
-  // Get VM logs (mock function - replace with actual implementation)
-  const vmLogs = computed(() => {
-    if (!vm.value || vm.value.status !== "RUNNING") {
-      return ["VM is not running. Start the VM to view logs."];
+  // Logs functionality
+  const vmLogs = ref<any[]>([]);
+  const isLoadingLogs = ref(false);
+  const logsError = ref<string | null>(null);
+  const logSearchQuery = ref("");
+  const logFilter = ref("all");
+  const logsAutoRefresh = ref(false);
+  const logsAutoRefreshInterval = ref<number | null>(null);
+  const logsLimit = ref(100);
+  const showLogDetails = ref<number | null>(null);
+  const logPageToken = ref<string | null>(null);
+  const hasMoreLogs = ref(false);
+  
+  // Logs filter options
+  const logFilterOptions = [
+    { id: "all", label: "All Logs" },
+    { id: "error", label: "Errors" },
+    { id: "warning", label: "Warnings" },
+    { id: "info", label: "Info" },
+    { id: "debug", label: "Debug" },
+  ];
+  
+  // Load logs
+  const loadVmLogs = async (loadMore = false) => {
+    if (!vm.value) return;
+    
+    if (!loadMore) {
+      isLoadingLogs.value = true;
+      logPageToken.value = null;
     }
-
-    return [
-      "[2025-04-06 08:12:34] VM started successfully",
-      "[2025-04-06 08:12:35] Loading model into memory...",
-      "[2025-04-06 08:13:22] Model loaded successfully",
-      "[2025-04-06 08:13:23] API server started on port 8080",
-      "[2025-04-06 08:13:24] Ready to accept requests",
+    
+    logsError.value = null;
+    
+    try {
+      const { vmName, zone } = getVmNameAndZone();
+      
+      const params: any = {
+        vmName,
+        zone,
+        limit: logsLimit.value,
+        filter: logFilter.value !== "all" ? logFilter.value : undefined,
+        search: logSearchQuery.value || undefined,
+        pageToken: loadMore ? logPageToken.value : undefined
+      };
+      
+      // This would be the actual API call to get logs
+      const response = await apiCaller.vm.getVmLogs.query(params);
+      
+      // Transform logs for display
+      const transformedLogs = (response.logs || []).map((log: any, index: number) => {
+        return {
+          id: loadMore ? vmLogs.value.length + index : index,
+          timestamp: log.timestamp || new Date().toISOString(),
+          severity: log.severity || "INFO",
+          message: log.message || log.textPayload || "No message",
+          json: log.jsonPayload || {},
+          source: log.source || log.resource?.labels?.instance_id || vmName,
+          raw: log
+        };
+      });
+      
+      if (loadMore) {
+        vmLogs.value = [...vmLogs.value, ...transformedLogs];
+      } else {
+        vmLogs.value = transformedLogs;
+      }
+      
+      // Handle pagination
+      logPageToken.value = response.nextPageToken || null;
+      hasMoreLogs.value = !!response.nextPageToken;
+      
+    } catch (err) {
+      console.error("Error loading VM logs:", err);
+      logsError.value = `Error loading logs: ${err instanceof Error ? err.message : String(err)}`;
+      
+      // For development - mock some logs when the API is not available
+      if (!vmLogs.value.length) {
+        mockVmLogs();
+      }
+    } finally {
+      isLoadingLogs.value = false;
+    }
+  };
+  
+  // Toggle auto-refresh for logs
+  const toggleLogsAutoRefresh = () => {
+    logsAutoRefresh.value = !logsAutoRefresh.value;
+    
+    if (logsAutoRefresh.value) {
+      // Refresh logs every 10 seconds
+      logsAutoRefreshInterval.value = window.setInterval(() => {
+        if (activeTab.value === "logs") {
+          loadVmLogs();
+        }
+      }, 10000);
+    } else if (logsAutoRefreshInterval.value) {
+      clearInterval(logsAutoRefreshInterval.value);
+      logsAutoRefreshInterval.value = null;
+    }
+  };
+  
+  // Download logs as JSON
+  const downloadLogs = () => {
+    if (!vmLogs.value.length) return;
+    
+    const dataStr = JSON.stringify(vmLogs.value, null, 2);
+    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+    
+    const exportFileDefaultName = `vm-logs-${vm.value?.name}-${new Date().toISOString().slice(0, 10)}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+  
+  // Clear search and filters
+  const clearLogsFilter = () => {
+    logSearchQuery.value = "";
+    logFilter.value = "all";
+    loadVmLogs();
+  };
+  
+  // Get log severity class for styling
+  const getLogSeverityClass = (severity: string) => {
+    const severityLower = severity.toLowerCase();
+    if (severityLower.includes('error') || severityLower === 'fatal' || severityLower === 'critical') {
+      return 'bg-red-100 text-red-800';
+    } else if (severityLower.includes('warn')) {
+      return 'bg-yellow-100 text-yellow-800';
+    } else if (severityLower === 'info') {
+      return 'bg-blue-100 text-blue-800';
+    } else if (severityLower === 'debug') {
+      return 'bg-gray-100 text-gray-800';
+    }
+    return 'bg-gray-100 text-gray-600';
+  };
+  
+  // Get severity icon
+  const getLogSeverityIcon = (severity: string) => {
+    const severityLower = severity.toLowerCase();
+    if (severityLower.includes('error') || severityLower === 'fatal' || severityLower === 'critical') {
+      return AlertCircleIcon;
+    } else if (severityLower.includes('warn')) {
+      return InfoIcon;
+    } else if (severityLower === 'info') {
+      return CheckCircleIcon;
+    } else {
+      return ClockIcon;
+    }
+  };
+  
+  // Format log timestamp
+  const formatLogTimestamp = (timestamp: string) => {
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleString();
+    } catch (e) {
+      return timestamp;
+    }
+  };
+  
+  // For development - create mock logs
+  const mockVmLogs = () => {
+    const severities = ["INFO", "WARNING", "ERROR", "DEBUG"];
+    const actions = [
+      "VM instance started",
+      "Loading model into memory",
+      "Model loaded successfully",
+      "API server starting",
+      "API server started on port 8080",
+      "Received request for model inference",
+      "Processed request in 245ms",
+      "Failed to load configuration",
+      "Out of memory error when loading large tensor",
+      "Rate limiting applied to incoming requests",
+      "Health check passed",
+      "System utilization at 75%",
+      "Garbage collection triggered",
+      "Updating model weights",
+      "Downloading model updates",
+      "Connection from unauthorized IP blocked",
     ];
+    
+    const mockLogs = [];
+    
+    // Generate 50 random logs with timestamps spreading over the last day
+    for (let i = 0; i < 50; i++) {
+      const timestamp = new Date(Date.now() - Math.random() * 86400000).toISOString();
+      const severity = severities[Math.floor(Math.random() * severities.length)];
+      const action = actions[Math.floor(Math.random() * actions.length)];
+      
+      mockLogs.push({
+        id: i,
+        timestamp,
+        severity,
+        message: `[${vm.value?.name}] ${action}`,
+        source: vm.value?.name || 'vm',
+        json: { 
+          vm: vm.value?.name,
+          action,
+          details: {
+            resourceId: `projects/my-project/zones/${vm.value?.zone}/instances/${vm.value?.name}`,
+            ipAddress: "10.0.0." + Math.floor(Math.random() * 255)
+          }
+        },
+        raw: {}
+      });
+    }
+    
+    // Sort by timestamp descending
+    mockLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    
+    vmLogs.value = mockLogs;
+    hasMoreLogs.value = true;
+  };
+  
+  // Watch for tab changes to load logs when needed
+  watch(activeTab, (newTab) => {
+    if (newTab === 'logs' && vm.value && vmLogs.value.length === 0) {
+      loadVmLogs();
+    }
+  });
+  
+  // Clean up auto-refresh on unmount
+  onUnmounted(() => {
+    if (logsAutoRefreshInterval.value) {
+      clearInterval(logsAutoRefreshInterval.value);
+    }
   });
 
   // Get VM performance data (mock function - replace with actual implementation)
@@ -703,21 +927,210 @@
           <div class="bg-white shadow rounded-lg p-6">
             <div class="flex justify-between items-center mb-4">
               <h2 class="text-lg font-medium">VM Logs</h2>
+              <div class="flex space-x-2">
+                <button
+                  class="text-sm text-gray-600 hover:text-gray-800 flex items-center"
+                  :class="{ 'text-green-600 hover:text-green-800': logsAutoRefresh }"
+                  @click="toggleLogsAutoRefresh"
+                  title="Auto refresh logs"
+                >
+                  <RefreshCwIcon
+                    class="h-4 w-4 mr-1"
+                    :class="{ 'animate-spin': logsAutoRefresh }"
+                  />
+                  {{ logsAutoRefresh ? 'Auto-refreshing' : 'Auto-refresh' }}
+                </button>
+                <button
+                  class="text-sm text-gray-600 hover:text-gray-800 flex items-center"
+                  @click="loadVmLogs"
+                  :disabled="isLoadingLogs"
+                  title="Refresh logs"
+                >
+                  <RefreshCwIcon
+                    class="h-4 w-4 mr-1"
+                    :class="{ 'animate-spin': isLoadingLogs }"
+                  />
+                  Refresh
+                </button>
+                <button
+                  v-if="vmLogs.length > 0"
+                  class="text-sm text-gray-600 hover:text-gray-800 flex items-center"
+                  @click="downloadLogs"
+                  title="Download logs as JSON"
+                >
+                  <DownloadIcon class="h-4 w-4 mr-1" />
+                  Download
+                </button>
+              </div>
+            </div>
+
+            <!-- Search and Filters -->
+            <div class="mb-4 flex flex-col md:flex-row gap-3">
+              <div class="flex-1 relative">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <SearchIcon class="h-4 w-4 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  v-model="logSearchQuery"
+                  @keyup.enter="loadVmLogs"
+                  placeholder="Search logs..."
+                  class="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                />
+              </div>
+              <div class="flex gap-2">
+                <select
+                  v-model="logFilter"
+                  @change="loadVmLogs"
+                  class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                >
+                  <option v-for="option in logFilterOptions" :key="option.id" :value="option.id">
+                    {{ option.label }}
+                  </option>
+                </select>
+                <button
+                  v-if="logSearchQuery || logFilter !== 'all'"
+                  class="text-sm text-gray-600 hover:text-gray-800 flex items-center rounded-md border border-gray-300 px-2"
+                  @click="clearLogsFilter"
+                  title="Clear filters"
+                >
+                  <XIcon class="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <!-- Loading state -->
+            <div v-if="isLoadingLogs && !vmLogs.length" class="py-12 text-center">
+              <LoaderIcon class="h-8 w-8 animate-spin mx-auto text-indigo-600 mb-4" />
+              <p class="text-gray-500">Loading logs...</p>
+            </div>
+
+            <!-- Error state -->
+            <div v-else-if="logsError && !vmLogs.length" class="bg-red-50 p-4 rounded-md mb-4">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <AlertCircleIcon class="h-5 w-5 text-red-400" />
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-red-800">Error loading logs</h3>
+                  <div class="mt-2 text-sm text-red-700">
+                    <p>{{ logsError }}</p>
+                  </div>
+                  <div class="mt-4">
+                    <button
+                      type="button"
+                      @click="loadVmLogs"
+                      class="rounded-md bg-red-50 px-2 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Logs Table View -->
+            <div v-else-if="vmLogs.length > 0" class="bg-white rounded-md border border-gray-200 overflow-hidden mb-2">
+              <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                  <thead class="bg-gray-50">
+                    <tr>
+                      <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Time
+                      </th>
+                      <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Severity
+                      </th>
+                      <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Message
+                      </th>
+                      <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-for="log in vmLogs" :key="log.id" class="hover:bg-gray-50">
+                      <td class="px-4 py-2 whitespace-nowrap text-xs text-gray-500">
+                        {{ formatLogTimestamp(log.timestamp) }}
+                      </td>
+                      <td class="px-4 py-2 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full" :class="getLogSeverityClass(log.severity)">
+                          <component :is="getLogSeverityIcon(log.severity)" class="h-3 w-3 mr-1" />
+                          {{ log.severity }}
+                        </span>
+                      </td>
+                      <td class="px-4 py-2 text-xs text-gray-900">
+                        <div class="truncate max-w-md">{{ log.message }}</div>
+                      </td>
+                      <td class="px-4 py-2 whitespace-nowrap text-right text-xs">
+                        <button 
+                          @click="showLogDetails = showLogDetails === log.id ? null : log.id"
+                          class="text-indigo-600 hover:text-indigo-900 underline"
+                        >
+                          {{ showLogDetails === log.id ? 'Hide Details' : 'View Details' }}
+                        </button>
+                      </td>
+                    </tr>
+                    <tr v-for="log in vmLogs" :key="`detail-${log.id}`" v-show="showLogDetails === log.id">
+                      <td colspan="4" class="px-4 py-4 bg-gray-50">
+                        <div class="text-sm">
+                          <h4 class="font-medium mb-2">Log Details</h4>
+                          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                              <p class="text-xs text-gray-500">Timestamp</p>
+                              <p class="text-sm">{{ formatLogTimestamp(log.timestamp) }}</p>
+                            </div>
+                            <div>
+                              <p class="text-xs text-gray-500">Source</p>
+                              <p class="text-sm">{{ log.source }}</p>
+                            </div>
+                          </div>
+                          <div class="mb-4">
+                            <p class="text-xs text-gray-500">Message</p>
+                            <p class="text-sm break-words">{{ log.message }}</p>
+                          </div>
+                          <div>
+                            <p class="text-xs text-gray-500">Payload</p>
+                            <pre class="text-xs bg-gray-900 text-gray-300 p-4 rounded-md overflow-x-auto">{{ JSON.stringify(log.json, null, 2) }}</pre>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <!-- Empty State -->
+            <div v-else class="bg-gray-50 rounded-md p-8 text-center">
+              <TerminalIcon class="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 class="text-lg font-medium text-gray-900 mb-2">No logs available</h3>
+              <p class="text-gray-500">
+                {{ vm && vm.status !== 'RUNNING' ? 'Start the VM to view logs' : 'No logs found for this VM' }}
+              </p>
               <button
-                class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center"
-                @click="loadVmDetails"
+                v-if="vm && vm.status === 'TERMINATED'"
+                @click="startVm"
+                :disabled="isStartingVm"
+                class="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
-                <RefreshCwIcon class="h-4 w-4 mr-1" />
-                Refresh Logs
+                <PlayIcon v-if="!isStartingVm" class="h-4 w-4 mr-1" />
+                <LoaderIcon v-else class="h-4 w-4 mr-1 animate-spin" />
+                Start VM
               </button>
             </div>
 
-            <div
-              class="bg-gray-900 text-gray-300 p-4 rounded-md font-mono text-sm h-96 overflow-y-auto"
-            >
-              <p v-for="(log, index) in vmLogs" :key="index" class="my-1">
-                {{ log }}
-              </p>
+            <!-- Load more logs -->
+            <div v-if="hasMoreLogs && vmLogs.length > 0" class="mt-4 text-center">
+              <button
+                @click="loadVmLogs(true)"
+                :disabled="isLoadingLogs"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <LoaderIcon v-if="isLoadingLogs" class="h-4 w-4 mr-1 animate-spin" />
+                Load More Logs
+              </button>
             </div>
           </div>
         </div>

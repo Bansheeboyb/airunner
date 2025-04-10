@@ -1477,14 +1477,14 @@
 }'</pre>
                 </div>
                 <button
-                  @click="copyToClipboard(`curl -X POST \\
-  ${vm.apiEndpoint || 'http://your-api-endpoint/api/generate'} \\
-  -H 'Content-Type: application/json' \\
-  -d '{\
-  \"prompt\": \"Hello, world!\",\
-  \"max_tokens\": 100,\
-  \"temperature\": 0.7\
-}'`)"
+                  @click="copyToClipboard('curl -X POST \\n  ' + 
+                  (vm.apiEndpoint || 'http://your-api-endpoint/api/generate') + ' \\n' +
+                  '  -H \'Content-Type: application/json\' \\n' +
+                  '  -d \'{\\n' +
+                  '  \"prompt\": \"Hello, world!\",\\n' +
+                  '  \"max_tokens\": 100,\\n' +
+                  '  \"temperature\": 0.7\\n' +
+                  '}\''"
                   class="mt-2 flex items-center text-xs text-indigo-400 hover:text-indigo-300"
                 >
                   <ClipboardCopyIcon class="h-3 w-3 mr-1" />

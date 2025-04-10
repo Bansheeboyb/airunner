@@ -108,6 +108,7 @@
         zone: response.zone,
         creationTimestamp: response.creationTimestamp,
         apiEndpoint: response.apiEndpoint,
+        instanceId: response.instanceId || null, // Store the instance ID from the API response
         labels: response.labels || {},
         // Additional properties with sensible defaults
         machineType: "n1-standard-4", // Default assumption
@@ -441,34 +442,39 @@
         filterString += ` textPayload:"${logSearchQuery.value}" OR jsonPayload:"${logSearchQuery.value}"`;
       }
       
-      // Include hardcoded instance ID for testing
-      const hardcodedInstanceId = "6576541849018811278";
+      // Get the instance ID from the VM object
+      const instanceId = vm.value.instanceId || null;
+      console.log("Using dynamic instance ID from VM:", instanceId);
       
       const params = {
         vmName,
         zone,
-        instanceId: hardcodedInstanceId, // Add this to ensure we're querying the right instance
+        instanceId, // Use the real instance ID from the VM
         filter: filterString,
         limit: logsLimit.value,
         pageToken: loadMore ? logPageToken.value : undefined,
         orderBy: "timestamp desc" // Most recent logs first
       };
       
-      console.log("Sending log fetch params with hardcoded instanceId:", params);
+      console.log("Sending log fetch params with dynamic instanceId:", params);
       
-      // Check if the VM is running before proceeding
-      if (vm.value.status !== "RUNNING") {
-        // If VM is not running, show a clear message 
+      // Check if the VM is running or if we don't have an instance ID
+      if (vm.value.status !== "RUNNING" || !instanceId) {
+        // If VM is not running or we don't have an instance ID, show appropriate message
         if (!vmLogs.value.length) {
-          // Only use mock data in development and if the VM is not running
+          // Only use mock data in development
           if (process.env.NODE_ENV === 'development') {
             mockVmLogs();
           } else {
+            let message = vm.value.status !== "RUNNING" 
+              ? "VM is not running. Start the VM to view actual logs."
+              : "Instance ID not available. Unable to fetch logs.";
+              
             vmLogs.value = [{
               id: 0,
               timestamp: new Date().toISOString(),
               severity: "INFO",
-              message: "VM is not running. Start the VM to view actual logs.",
+              message: message,
               json: {},
               source: vmName,
               raw: {}
@@ -491,13 +497,15 @@
       // In production, try to use the real API endpoint
       let response;
       try {
-        console.log("Fetching logs with hardcoded instance ID:", hardcodedInstanceId);
+        console.log("Fetching logs with instance ID:", instanceId);
         response = await apiCaller.vm.getVmLogs.query(params);
         
         // Log success for debugging
-        console.log(`Successfully fetched ${response?.logs?.length || 0} logs`);
+        console.log(`Successfully fetched ${response?.logs?.length || 0} logs for instance ID: ${instanceId || 'N/A'}`);
         if (response?.logs?.length > 0) {
           console.log("First log sample:", response.logs[0]);
+        } else {
+          console.log("No logs found for instance ID:", instanceId);
         }
       } catch (apiError) {
         console.error("API endpoint error:", apiError);

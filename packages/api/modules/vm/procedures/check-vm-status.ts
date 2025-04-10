@@ -97,7 +97,21 @@ export const checkVmStatus = protectedProcedure
         console.log("VM not running or no network interfaces found");
       }
 
-      // Return a safer, more structured response
+      // Extract the instance ID from the vm.id or selfLink
+      let instanceId = null;
+      if (vm.id) {
+        instanceId = vm.id.toString();
+        console.log("Found instance ID from vm.id:", instanceId);
+      } else if (vm.selfLink) {
+        // Extract instance ID from selfLink URL
+        const selfLinkMatch = vm.selfLink.match(/\/instances\/([^\/]+)$/);
+        if (selfLinkMatch && selfLinkMatch[1]) {
+          instanceId = selfLinkMatch[1];
+          console.log("Extracted instance ID from selfLink:", instanceId);
+        }
+      }
+      
+      // Return a safer, more structured response with instanceId
       return {
         status: "success",
         vmStatus: vm.status || "UNKNOWN",
@@ -108,6 +122,7 @@ export const checkVmStatus = protectedProcedure
         zone: zoneStr,
         name: vm.name,
         creationTimestamp: vm.creationTimestamp,
+        instanceId, // Add the instance ID to the response
       };
     } catch (error) {
       console.error("Error checking VM status:", error);

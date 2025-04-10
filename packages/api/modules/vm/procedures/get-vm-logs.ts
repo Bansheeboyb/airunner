@@ -57,22 +57,26 @@ export const getVmLogs = protectedProcedure
         scopes: ["https://www.googleapis.com/auth/cloud-platform"],
       });
 
-      // Hardcode the known instance ID that has logs
-      const hardcodedInstanceId = "6576541849018811278";
-      console.log("Using hardcoded instance ID:", hardcodedInstanceId);
+      // Use the dynamic instance ID from the input if available
+      const dynamicInstanceId = instanceId || vmName;
+      console.log("Using dynamic instance ID:", dynamicInstanceId);
       
-      // Try multiple filter variations to ensure we get logs
-      // This simpler filter is exactly what works in the GCP logs explorer
+      // Create filter with the dynamic instance ID
       // We'll try both string format and numeric format since GCP can sometimes treat instance IDs differently
-      let filter = `resource.type="gce_instance" AND (resource.labels.instance_id="${hardcodedInstanceId}" OR resource.labels.instance_id=${hardcodedInstanceId})`;
+      let filter = input.filter;
       
-      // Also add a time restriction to focus on more recent logs
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      const timeRestriction = `timestamp>="${oneWeekAgo.toISOString()}"`;
-      
-      // Add time restriction to filter
-      filter = `${filter} AND ${timeRestriction}`;
+      // If no custom filter is provided, create one using the instance ID
+      if (!filter) {
+        filter = `resource.type="gce_instance" AND (resource.labels.instance_id="${dynamicInstanceId}" OR resource.labels.instance_id=${dynamicInstanceId})`;
+        
+        // Also add a time restriction to focus on more recent logs
+        const oneWeekAgo = new Date();
+        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const timeRestriction = `timestamp>="${oneWeekAgo.toISOString()}"`;
+        
+        // Add time restriction to filter
+        filter = `${filter} AND ${timeRestriction}`;
+      }
       
       // Log the filter for debugging
       console.log("Using filter with hardcoded instance ID:", filter);

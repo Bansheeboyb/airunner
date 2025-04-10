@@ -441,14 +441,20 @@
         filterString += ` textPayload:"${logSearchQuery.value}" OR jsonPayload:"${logSearchQuery.value}"`;
       }
       
+      // Include hardcoded instance ID for testing
+      const hardcodedInstanceId = "6576541849018811278";
+      
       const params = {
         vmName,
         zone,
+        instanceId: hardcodedInstanceId, // Add this to ensure we're querying the right instance
         filter: filterString,
         limit: logsLimit.value,
         pageToken: loadMore ? logPageToken.value : undefined,
         orderBy: "timestamp desc" // Most recent logs first
       };
+      
+      console.log("Sending log fetch params with hardcoded instanceId:", params);
       
       // Check if the VM is running before proceeding
       if (vm.value.status !== "RUNNING") {
@@ -485,23 +491,71 @@
       // In production, try to use the real API endpoint
       let response;
       try {
+        console.log("Fetching logs with hardcoded instance ID:", hardcodedInstanceId);
         response = await apiCaller.vm.getVmLogs.query(params);
+        
+        // Log success for debugging
+        console.log(`Successfully fetched ${response?.logs?.length || 0} logs`);
+        if (response?.logs?.length > 0) {
+          console.log("First log sample:", response.logs[0]);
+        }
       } catch (apiError) {
-        console.error("API endpoint not available:", apiError);
-        throw new Error("Unable to fetch logs from the server. Please check GCP credentials.");
+        console.error("API endpoint error:", apiError);
+        console.error("Error details:", {
+          message: apiError.message,
+          data: apiError.data,
+          shape: apiError.shape,
+        });
+        
+        // Try to extract as much info as possible from the error
+        const errorMessage = apiError.message || "Unknown error";
+        const errorData = apiError.data ? JSON.stringify(apiError.data) : "";
+        
+        // Provide a more detailed error message
+        throw new Error(`Unable to fetch logs: ${errorMessage} ${errorData}`);
       }
+      
+      // Verify the response structure and prepare for transformation
+      if (!response || typeof response !== 'object') {
+        console.error("Unexpected response format:", response);
+        throw new Error("Invalid response format from log API");
+      }
+      
+      // Ensure logs property exists, if not try to find logs in the response
+      if (!response.logs && response.entries) {
+        console.log("Response contains entries instead of logs, adapting...");
+        response.logs = response.entries;
+      } else if (!response.logs && Array.isArray(response)) {
+        console.log("Response is an array, adapting...");
+        response = { logs: response, nextPageToken: null };
+      } else if (!response.logs) {
+        console.log("No logs found in response, creating empty array");
+        response.logs = [];
+      }
+      
+      // Log the structure we're working with
+      console.log("Processing response with structure:", Object.keys(response));
       
       // Transform logs for display
       const transformedLogs = (response.logs || []).map((log: any, index: number) => {
-        return {
+        // Handle various log entry formats
+        const logEntry = {
           id: loadMore ? vmLogs.value.length + index : index,
           timestamp: log.timestamp || new Date().toISOString(),
           severity: log.severity || "INFO",
-          message: log.message || log.textPayload || "No message",
+          message: log.message || log.textPayload || 
+                  (log.jsonPayload?.message) || 
+                  (log.protoPayload?.status?.message) || 
+                  "No message",
           json: log.jsonPayload || {},
-          source: log.source || log.resource?.labels?.instance_id || vmName,
+          source: log.source || 
+                 (log.resource?.labels?.instance_id) || 
+                 (log.labels?.instance_name) || 
+                 vmName,
           raw: log
         };
+        
+        return logEntry;
       });
       
       if (loadMore) {

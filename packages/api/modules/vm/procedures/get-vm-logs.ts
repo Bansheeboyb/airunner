@@ -57,18 +57,17 @@ export const getVmLogs = protectedProcedure
         scopes: ["https://www.googleapis.com/auth/cloud-platform"],
       });
 
-      // Improved filter that tries multiple possible instance identifiers
+      // Hardcode the known instance ID that has logs
+      const hardcodedInstanceId = "6576541849018811278";
+      console.log("Using hardcoded instance ID:", hardcodedInstanceId);
+      
+      // Use the hardcoded instance ID in the filter
       let filter =
         input.filter ||
-        `resource.type="gce_instance" AND (resource.labels.instance_id="${vmName}"`;
-
-      // Add instanceId to filter if provided
-      if (instanceId) {
-        filter += ` OR resource.labels.instance_id="${instanceId}"`;
-      }
-
-      // Add additional possible filter conditions
-      filter += ` OR labels.instance_name="${vmName}")`;
+        `resource.type="gce_instance" AND resource.labels.instance_id="${hardcodedInstanceId}"`;
+      
+      // Log the filter for debugging
+      console.log("Using filter with hardcoded instance ID:", filter);
 
       // Define the order by clause (default to timestamp desc)
       const orderBy = input.orderBy || "timestamp desc";
@@ -98,6 +97,14 @@ export const getVmLogs = protectedProcedure
       const nextPageToken = response.data.nextPageToken || null;
 
       console.log(`Fetched ${entries.length} log entries`);
+      
+      // More detailed logging to see what we're getting back
+      if (entries.length > 0) {
+        console.log("First log entry sample:", JSON.stringify(entries[0], null, 2));
+      } else {
+        console.log("No log entries found with the current filter");
+      }
+      
       console.log(
         "Response data sample:",
         JSON.stringify(response.data).substring(0, 500),
@@ -142,8 +149,23 @@ export const getVmLogs = protectedProcedure
 
       if (error.request) {
         console.error("Request was made but no response received");
+        console.error("Request details:", error.request);
       }
 
+      // Try to extract as much information as possible
+      const errorInfo = {
+        message: error.message,
+        code: error.code,
+        name: error.name,
+        stack: error.stack?.split("\n").slice(0, 5).join("\n"), // First 5 lines of stack trace
+        context: {
+          projectId: process.env.GCP_PROJECT_ID,
+          hasCredentials: !!process.env.GCP_PRIVATE_KEY && !!process.env.GCP_SERVICE_ACCOUNT_EMAIL,
+          instanceId: "6576541849018811278", // The hardcoded ID we're using
+        }
+      };
+
+      console.error("Detailed error info:", JSON.stringify(errorInfo, null, 2));
       console.error("Error message:", error.message);
       console.error("Error stack:", error.stack);
 

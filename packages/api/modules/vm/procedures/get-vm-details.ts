@@ -124,9 +124,6 @@ export const getVmDetails = protectedProcedure
         acceleratorCount = accelerator.acceleratorCount;
       }
 
-      // Log the numeric instance ID for debugging
-      console.log("VM numeric instance ID:", vm.id);
-
       // Return a comprehensive response
       return {
         id: input.vmId,
@@ -145,10 +142,6 @@ export const getVmDetails = protectedProcedure
         tags: vm.tags || {},
         metadata: vm.metadata || {},
         lastStatusUpdate: vm.lastStartTimestamp || vm.creationTimestamp,
-        // Include both the original id and a dedicated instanceId field
-        // that holds the numeric GCP instance ID needed for logging
-        instanceId: vm.id, // Add this line to explicitly include the numeric instance ID
-        gcpInstanceId: vm.id, // Alternative name if needed
       };
     } catch (error) {
       console.error("Error fetching VM details:", error);

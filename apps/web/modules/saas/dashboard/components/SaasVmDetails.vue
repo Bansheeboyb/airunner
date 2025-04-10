@@ -1480,10 +1480,10 @@
                   @click="copyToClipboard(`curl -X POST \\
   ${vm.apiEndpoint || 'http://your-api-endpoint/api/generate'} \\
   -H 'Content-Type: application/json' \\
-  -d '{
-  \"prompt\": \"Hello, world!\",
-  \"max_tokens\": 100,
-  \"temperature\": 0.7
+  -d '{\
+  \"prompt\": \"Hello, world!\",\
+  \"max_tokens\": 100,\
+  \"temperature\": 0.7\
 }'`)"
                   class="mt-2 flex items-center text-xs text-indigo-400 hover:text-indigo-300"
                 >

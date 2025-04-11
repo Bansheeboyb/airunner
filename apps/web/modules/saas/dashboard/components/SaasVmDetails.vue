@@ -51,6 +51,22 @@
   const activeTab = ref("overview");
   const tabs = [
     { id: "overview", label: "Overview", icon: ServerIcon },
+    { id: "features", label: "Features", icon: function ChatIcon() {
+      return h('svg', {
+        xmlns: 'http://www.w3.org/2000/svg',
+        viewBox: '0 0 24 24',
+        fill: 'none', 
+        stroke: 'currentColor',
+        'stroke-width': 2,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        class: 'lucide'
+      }, [
+        h('path', { d: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' }),
+        h('path', { d: 'M13 8H7' }),
+        h('path', { d: 'M17 12H7' })
+      ]);
+    } },
     { id: "logs", label: "Logs", icon: TerminalIcon },
     { id: "performance", label: "Performance", icon: ActivityIcon },
   ];
@@ -1062,10 +1078,229 @@
     };
   });
 
+  // AI Chat functionality
+  const chatMessages = ref<any[]>([
+    {
+      role: 'system',
+      content: 'Welcome to your deployed AI model. How can I help you today?',
+      timestamp: new Date().toISOString()
+    }
+  ]);
+  const userInput = ref('');
+  const isSendingMessage = ref(false);
+  const chatError = ref<string | null>(null);
+  const systemRole = ref('You are a helpful, friendly AI assistant.');
+  const temperature = ref(0.7);
+  const maxTokens = ref(1000);
+  
+  // Chat interface settings
+  const isSettingsOpen = ref(false);
+  const isDownloadingChat = ref(false);
+  const isClearingChat = ref(false);
+  const modelCategory = computed(() => {
+    return vm.value?.modelDetails?.category || 'AI Model';
+  });
+  
+  // Determine if the current model is a text generation model
+  const isTextGenerationModel = computed(() => {
+    const category = modelCategory.value.toLowerCase();
+    return category.includes('text') || 
+           category.includes('generation') || 
+           category.includes('llm') ||
+           vm.value?.labels?.model_name?.toLowerCase().includes('claude') ||
+           vm.value?.labels?.model_name?.toLowerCase().includes('llama') ||
+           vm.value?.labels?.model_name?.toLowerCase().includes('gpt') ||
+           vm.value?.labels?.model_name?.toLowerCase().includes('mistral') ||
+           vm.value?.labels?.model_name?.toLowerCase().includes('gemini');
+  });
+  
+  // Send a message to the AI model
+  const sendMessage = async () => {
+    if (!userInput.value.trim() || isSendingMessage.value) return;
+    if (!vm.value?.apiEndpoint || vm.value?.status !== 'RUNNING') {
+      chatError.value = 'The VM must be running to use the model.';
+      return;
+    }
+    
+    try {
+      isSendingMessage.value = true;
+      chatError.value = null;
+      
+      // Add user message to chat
+      const userMessage = {
+        role: 'user',
+        content: userInput.value,
+        timestamp: new Date().toISOString()
+      };
+      chatMessages.value.push(userMessage);
+      
+      // Clear input field
+      const userText = userInput.value;
+      userInput.value = '';
+      
+      // Add placeholder for AI response
+      const assistantMessageId = Date.now();
+      chatMessages.value.push({
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        isTyping: true,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Create conversation history in the format the API expects
+      const messages = chatMessages.value
+        .filter(msg => msg.role !== 'system' || msg.role !== 'assistant' || !msg.isTyping)
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+        
+      // Add system message as the first message
+      messages.unshift({
+        role: 'system',
+        content: systemRole.value
+      });
+      
+      // In development mode, use mock responses
+      if (process.env.NODE_ENV === 'development') {
+        // Simulate API delay
+        await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
+        
+        // Update with mock response
+        const mockResponses = [
+          `I'd be happy to help with that! Based on what you're asking about "${userText}", I think we should consider a few approaches...`,
+          `That's an interesting question about "${userText}". Let me share some thoughts on this topic...`,
+          `Thanks for your message about "${userText}". Here's what I can tell you based on my knowledge...`,
+          `I understand you're asking about "${userText}". Here's my response to your question...`
+        ];
+        
+        const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
+        
+        // Find the placeholder message and update it
+        const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
+        if (index !== -1) {
+          chatMessages.value[index] = {
+            role: 'assistant',
+            content: randomResponse,
+            timestamp: new Date().toISOString()
+          };
+        }
+      } else {
+        // In production, make actual API call
+        try {
+          const response = await fetch(vm.value.apiEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              messages,
+              temperature: temperature.value,
+              max_tokens: maxTokens.value,
+              model: vm.value?.labels?.model_name || 'default'
+            }),
+          });
+          
+          if (!response.ok) {
+            throw new Error(`API responded with status: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          // Find the placeholder message and update it
+          const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
+          if (index !== -1) {
+            chatMessages.value[index] = {
+              role: 'assistant',
+              content: data.choices?.[0]?.message?.content || data.text || data.content || 'No response content',
+              timestamp: new Date().toISOString()
+            };
+          }
+        } catch (error) {
+          console.error('Error calling VM API:', error);
+          
+          // Find the placeholder message and update it with error
+          const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
+          if (index !== -1) {
+            chatMessages.value[index] = {
+              role: 'assistant',
+              content: 'Sorry, I encountered an error processing your request. Please try again or check if the API endpoint is correctly configured.',
+              isError: true,
+              timestamp: new Date().toISOString()
+            };
+          }
+          
+          chatError.value = `Error: ${error instanceof Error ? error.message : String(error)}`;
+        }
+      }
+    } catch (err) {
+      console.error('Error in chat process:', err);
+      chatError.value = `Error sending message: ${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      isSendingMessage.value = false;
+    }
+  };
+  
+  // Clear chat history
+  const clearChat = () => {
+    isClearingChat.value = true;
+    
+    // Add confirmation step
+    if (confirm('Are you sure you want to clear the chat history?')) {
+      chatMessages.value = [{
+        role: 'system',
+        content: 'Chat history has been cleared. How can I help you today?',
+        timestamp: new Date().toISOString()
+      }];
+    }
+    
+    isClearingChat.value = false;
+  };
+  
+  // Download chat history
+  const downloadChat = () => {
+    isDownloadingChat.value = true;
+    
+    try {
+      const chatData = JSON.stringify(chatMessages.value, null, 2);
+      const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(chatData)}`;
+      const exportFileName = `${vm.value?.name}-chat-${new Date().toISOString().slice(0, 10)}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileName);
+      linkElement.click();
+    } catch (err) {
+      console.error('Error downloading chat:', err);
+      chatError.value = 'Failed to download chat history';
+    } finally {
+      isDownloadingChat.value = false;
+    }
+  };
+  
+  // Toggle settings panel
+  const toggleSettings = () => {
+    isSettingsOpen.value = !isSettingsOpen.value;
+  };
+
   // Clean up on component unmount
   onUnmounted(() => {
     stopPolling();
   });
+
+  // Auto-scroll to the bottom of the chat
+  const messagesEnd = ref<HTMLElement | null>(null);
+  
+  const scrollToBottom = () => {
+    if (messagesEnd.value) {
+      messagesEnd.value.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+  
+  // Watch for new messages and scroll to bottom
+  watch(() => chatMessages.value.length, scrollToBottom);
+  watch(() => chatMessages.value[chatMessages.value.length - 1]?.content, scrollToBottom);
 
   // Initial load
   onMounted(() => {
@@ -2072,6 +2307,251 @@
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- Features Tab - AI Model Interface -->
+        <div v-else-if="activeTab === 'features'" class="space-y-6">
+          <div v-if="vm.status !== 'RUNNING'" class="bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-800 p-6 text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-800 mb-4">
+              <component :is="getModelTypeIcon(vm.modelDetails?.category)" class="h-8 w-8 text-gray-500" />
+            </div>
+            <h3 class="text-lg font-medium text-gray-200 mb-2">Model Not Available</h3>
+            <p class="text-gray-400 max-w-md mx-auto mb-6">
+              This VM must be running to use the deployed AI model features.
+            </p>
+            <button
+              v-if="vm.status === 'TERMINATED'"
+              @click="startVm"
+              :disabled="isStartingVm"
+              class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200"
+            >
+              <PlayIcon v-if="!isStartingVm" class="h-4 w-4 mr-1.5" />
+              <LoaderIcon v-else class="h-4 w-4 mr-1.5 animate-spin" />
+              Start VM
+            </button>
+          </div>
+
+          <template v-else>
+            <!-- Chat Interface for Text Generation Models -->
+            <div v-if="isTextGenerationModel" class="bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-800">
+              <div class="flex flex-col h-[600px]">
+                <!-- Chat Header -->
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+                  <div class="flex items-center">
+                    <component :is="getModelTypeIcon(vm.modelDetails?.category)" class="h-5 w-5 mr-2 text-indigo-400" />
+                    <h3 class="text-gray-100 font-medium">{{ vm.labels?.model_name || "AI Chat" }}</h3>
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-900/50 text-green-300">
+                      LIVE
+                    </span>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button 
+                      @click="toggleSettings" 
+                      class="p-2 rounded text-gray-400 hover:text-gray-300 hover:bg-gray-800 transition-colors"
+                      title="Settings"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+                        <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </button>
+                    <button 
+                      @click="clearChat" 
+                      :disabled="isClearingChat || chatMessages.length <= 1"
+                      class="p-2 rounded text-gray-400 hover:text-gray-300 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Clear chat"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
+                        <path d="M3 6h18"></path>
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+                      </svg>
+                    </button>
+                    <button 
+                      @click="downloadChat" 
+                      :disabled="isDownloadingChat || chatMessages.length <= 1"
+                      class="p-2 rounded text-gray-400 hover:text-gray-300 hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Download chat"
+                    >
+                      <DownloadIcon class="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- Settings Panel (conditionally displayed) -->
+                <div v-if="isSettingsOpen" class="p-4 bg-gray-800 border-b border-gray-700">
+                  <h4 class="text-sm font-medium text-gray-200 mb-3">Chat Settings</h4>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label class="block text-xs font-medium text-gray-400 mb-1">System Role</label>
+                      <textarea 
+                        v-model="systemRole"
+                        rows="2"
+                        class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-300 resize-none"
+                        placeholder="System instructions for the AI..."
+                      ></textarea>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-400 mb-1">Temperature</label>
+                      <div class="flex items-center gap-2">
+                        <input 
+                          type="range" 
+                          v-model="temperature" 
+                          min="0" 
+                          max="1" 
+                          step="0.1"
+                          class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <span class="text-xs text-gray-300 w-8">{{ temperature }}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label class="block text-xs font-medium text-gray-400 mb-1">Max Tokens</label>
+                      <input 
+                        type="number" 
+                        v-model="maxTokens" 
+                        min="100" 
+                        max="4000" 
+                        step="100"
+                        class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Chat Messages -->
+                <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-950">
+                  <div v-for="(message, index) in chatMessages" :key="index" 
+                    :class="[
+                      'flex', 
+                      message.role === 'user' ? 'justify-end' : 'justify-start'
+                    ]"
+                  >
+                    <div 
+                      :class="[
+                        'rounded-lg px-4 py-2 max-w-md break-words', 
+                        message.role === 'user' 
+                          ? 'bg-indigo-600 text-white' 
+                          : message.role === 'system'
+                            ? 'bg-gray-800 text-gray-300 text-sm italic'
+                            : message.isError
+                              ? 'bg-red-900/30 border border-red-800 text-gray-200'
+                              : 'bg-gray-800 text-gray-200'
+                      ]"
+                    >
+                      <div v-if="message.isTyping" class="flex items-center space-x-1">
+                        <div class="h-2 w-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0ms"></div>
+                        <div class="h-2 w-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 150ms"></div>
+                        <div class="h-2 w-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 300ms"></div>
+                      </div>
+                      <div v-else class="whitespace-pre-wrap">{{ message.content }}</div>
+                      <div v-if="!message.isTyping && message.role !== 'system'" class="text-xs opacity-50 mt-1">
+                        {{ new Date(message.timestamp).toLocaleTimeString() }}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Auto-scrolling spacer -->
+                  <div ref="messagesEnd"></div>
+                </div>
+                
+                <!-- Error Banner -->
+                <div v-if="chatError" class="p-3 bg-red-900/30 border-t border-red-800">
+                  <div class="flex items-start gap-2">
+                    <AlertCircleIcon class="h-5 w-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <div class="text-sm text-red-300">{{ chatError }}</div>
+                  </div>
+                </div>
+                
+                <!-- Chat Input -->
+                <div class="p-4 border-t border-gray-800">
+                  <form @submit.prevent="sendMessage" class="flex gap-2">
+                    <textarea
+                      v-model="userInput"
+                      @keydown.enter.prevent="sendMessage"
+                      placeholder="Type your message..."
+                      class="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-gray-200 resize-none min-h-[44px] max-h-32"
+                      :disabled="isSendingMessage || vm.status !== 'RUNNING'"
+                      rows="1"
+                    ></textarea>
+                    <button
+                      type="submit"
+                      class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-md p-2 h-[44px] w-[44px] flex items-center justify-center flex-shrink-0 transition-colors"
+                      :disabled="!userInput.trim() || isSendingMessage || vm.status !== 'RUNNING'"
+                      :class="{ 'opacity-50 cursor-not-allowed': !userInput.trim() || isSendingMessage || vm.status !== 'RUNNING' }"
+                    >
+                      <LoaderIcon v-if="isSendingMessage" class="h-5 w-5 animate-spin" />
+                      <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
+                        <path d="m3 3 3 9-3 9 19-9Z" />
+                        <path d="M6 12h16" />
+                      </svg>
+                    </button>
+                  </form>
+                  <p class="text-xs text-gray-500 mt-2">
+                    {{ vm.apiEndpoint ? 'Using endpoint: ' + vm.apiEndpoint : 'API endpoint not available' }}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Non-Text Generation Model Interface -->
+            <div v-else class="bg-gray-900 shadow-xl rounded-lg overflow-hidden border border-gray-800">
+              <div class="p-6 border-b border-gray-800">
+                <div class="flex items-center justify-between">
+                  <h2 class="text-xl font-semibold text-gray-100 flex items-center">
+                    <component :is="getModelTypeIcon(vm.modelDetails?.category)" class="h-5 w-5 mr-2 text-indigo-400" />
+                    {{ modelCategory }} Interface
+                  </h2>
+                  <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-900/50 text-green-300">
+                    RUNNING
+                  </span>
+                </div>
+              </div>
+              
+              <div class="p-6">
+                <div class="flex flex-col items-center justify-center py-8 text-center">
+                  <div class="w-16 h-16 rounded-full bg-indigo-900/50 flex items-center justify-center mb-4">
+                    <component :is="getModelTypeIcon(vm.modelDetails?.category)" class="h-8 w-8 text-indigo-400" />
+                  </div>
+                  <h3 class="text-lg font-medium text-gray-100 mb-2">
+                    {{ modelCategory }} Interface Coming Soon
+                  </h3>
+                  <p class="text-gray-400 max-w-md">
+                    Support for {{ vm.modelDetails?.category || "this model type" }} is under development. 
+                    Meanwhile, you can access this model through the API endpoint directly.
+                  </p>
+                  
+                  <div class="mt-8 w-full max-w-2xl">
+                    <div class="bg-gray-800 p-4 rounded-md border border-gray-700">
+                      <div class="flex justify-between items-center mb-3">
+                        <div class="flex items-center text-gray-400">
+                          <span class="text-xs uppercase tracking-wider">API Endpoint</span>
+                          <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-900/50 text-green-300">ACTIVE</span>
+                        </div>
+                        <button
+                          @click="copyToClipboard(vm.apiEndpoint)"
+                          class="p-1 rounded text-indigo-400 hover:text-indigo-300 hover:bg-gray-700 transition-colors"
+                          title="Copy to clipboard"
+                        >
+                          <ClipboardCopyIcon class="h-4 w-4" />
+                        </button>
+                      </div>
+                      <p class="font-mono text-sm text-gray-300 break-all">
+                        {{ vm.apiEndpoint || "API endpoint not available" }}
+                      </p>
+                    </div>
+                    
+                    <div v-if="copySuccess" class="mt-2 text-xs text-green-400 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3 w-3 mr-1">
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                      Copied to clipboard!
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
 
         <!-- Performance Tab -->

@@ -1148,19 +1148,52 @@
         timestamp: new Date().toISOString()
       });
       
-      // Create conversation history in the format the API expects
-      const messages = chatMessages.value
-        .filter(msg => msg.role !== 'system' || msg.role !== 'assistant' || !msg.isTyping)
-        .map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }));
+      // Determine the model type to adjust request format
+      const modelName = vm.value?.labels?.model_name?.toLowerCase() || '';
+      let requestPayload;
+      
+      // Create message history based on model type
+      if (modelName.includes('phi')) {
+        // Phi-specific format using the last user message as prompt
+        requestPayload = {
+          prompt: userText,
+          system_prompt: systemRole.value,
+          temperature: temperature.value,
+          max_tokens: maxTokens.value
+        };
+      } else if (modelName.includes('llama') || modelName.includes('mistral')) {
+        // Some Llama.cpp and Mistral models use this format
+        const userPrompt = userText;
+        requestPayload = {
+          prompt: userPrompt,
+          temperature: temperature.value,
+          max_tokens: maxTokens.value,
+          system_prompt: systemRole.value
+        };
+      } else {
+        // Standard OpenAI-compatible format (Claude, OpenAI, etc.)
+        const messages = chatMessages.value
+          .filter(msg => msg.role !== 'system' && (!msg.isTyping || msg.role !== 'assistant'))
+          .map(msg => ({
+            role: msg.role,
+            content: msg.content
+          }));
+          
+        // Add system message as the first message
+        messages.unshift({
+          role: 'system',
+          content: systemRole.value
+        });
         
-      // Add system message as the first message
-      messages.unshift({
-        role: 'system',
-        content: systemRole.value
-      });
+        requestPayload = {
+          messages,
+          temperature: temperature.value,
+          max_tokens: maxTokens.value,
+          model: vm.value?.labels?.model_name || 'default'
+        };
+      }
+      
+      console.log("Using request payload format:", requestPayload);
       
       // In development mode, use mock responses
       if (process.env.NODE_ENV === 'development') {
@@ -1194,12 +1227,7 @@
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              messages,
-              temperature: temperature.value,
-              max_tokens: maxTokens.value,
-              model: vm.value?.labels?.model_name || 'default'
-            }),
+            body: JSON.stringify(requestPayload),
           });
           
           if (!response.ok) {
@@ -1207,13 +1235,47 @@
           }
           
           const data = await response.json();
+          console.log("API response:", data);
+          
+          // Parse response based on model output format
+          let responseText = '';
+          
+          // Check for Phi-specific format
+          if (data.response !== undefined) {
+            responseText = data.response;
+          }
+          // Check for standard OpenAI format
+          else if (data.choices && data.choices.length > 0) {
+            responseText = data.choices[0].message?.content || data.choices[0].text;
+          }
+          // Check for content field (Claude)
+          else if (data.content) {
+            responseText = data.content;
+          }
+          // Check for direct text field
+          else if (data.text) {
+            responseText = data.text;
+          }
+          // Check for output field (Llama.cpp, others)
+          else if (data.output) {
+            responseText = data.output;
+          }
+          // Check for generation field (Mistral)
+          else if (data.generation) {
+            responseText = data.generation;
+          }
+          // Fallback to the entire response body as string
+          else {
+            console.warn("Unknown API response format:", data);
+            responseText = JSON.stringify(data);
+          }
           
           // Find the placeholder message and update it
           const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
           if (index !== -1) {
             chatMessages.value[index] = {
               role: 'assistant',
-              content: data.choices?.[0]?.message?.content || data.text || data.content || 'No response content',
+              content: responseText || 'No response content',
               timestamp: new Date().toISOString()
             };
           }

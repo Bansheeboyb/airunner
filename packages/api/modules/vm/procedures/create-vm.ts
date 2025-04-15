@@ -129,6 +129,8 @@ export const createVm = protectedProcedure
       gpuCount: z.number().int().optional(),
       region: z.string().default("us-central1"),
       teamId: z.string(),
+      // Optional server label for custom naming
+      serverLabel: z.string().optional(),
     }),
   )
   .mutation(async ({ input, ctx }) => {
@@ -145,9 +147,18 @@ export const createVm = protectedProcedure
         .digest("hex")
         .substring(0, 8);
 
-      const vmName = `llm-${input.modelName
+      // Use server label if provided, otherwise use model name
+      const serverPrefix = input.serverLabel
+        ? input.serverLabel.toLowerCase().replace(/[^a-z0-9\-]/g, "-")
+        : input.modelName.toLowerCase().replace(/\s/g, "-");
+
+      const vmName = `llm-${serverPrefix}-${uniqueId}`;
+
+      // Create a server name with organization ID included for better organization
+      const normalizedOrgId = organizationId
         .toLowerCase()
-        .replace(/\s/g, "-")}-${uniqueId}`;
+        .replace(/[^a-z0-9\-]/g, "-");
+      const serverName = `${vmName}.${normalizedOrgId}.yourdomain.com`;
 
       // Add debug logging to check environment variables
       console.log("GCP Auth Status:", !!process.env.GCP_PRIVATE_KEY);
@@ -156,6 +167,8 @@ export const createVm = protectedProcedure
         "Service Account Email:",
         process.env.GCP_SERVICE_ACCOUNT_EMAIL,
       );
+      console.log("VM Name:", vmName);
+      console.log("Server Name:", serverName);
 
       // Fix private key newline formatting issues
       let privateKey = process.env.GCP_PRIVATE_KEY || "";
@@ -204,36 +217,7 @@ export const createVm = protectedProcedure
       }-${input.memoryGB * 1024}`;
 
       // Define VM creation parameters
-      const vmConfig: {
-        name: string;
-        machineType: string;
-        tags: { items: string[] };
-        labels: { [key: string]: string };
-        disks: {
-          boot: boolean;
-          autoDelete: boolean;
-          initializeParams: { sourceImage: string; diskSizeGb: string };
-        }[];
-        networkInterfaces: {
-          network: string;
-          accessConfigs: { type: string; name: string }[];
-        }[];
-        metadata: {
-          items: { key: string; value: string }[];
-        };
-        scheduling: {
-          preemptible: boolean;
-          onHostMaintenance?: string;
-        };
-        serviceAccounts: {
-          email: string;
-          scopes: string[];
-        }[];
-        guestAccelerators?: {
-          acceleratorType: string;
-          acceleratorCount: number;
-        }[];
-      } = {
+      const vmConfig = {
         name: vmName,
         machineType: machineType,
         tags: {
@@ -245,13 +229,12 @@ export const createVm = protectedProcedure
         },
         // Add labels for organization and user tracking
         labels: {
-          organization_id: organizationId
-            .replace(/[^a-z0-9\-_]/gi, "-")
-            .toLowerCase(),
+          organization_id: normalizedOrgId,
           user_id: userId.replace(/[^a-z0-9\-_]/gi, "-").toLowerCase(),
           created_by: "supastarter",
           model_name: input.modelName.toLowerCase().replace(/\s/g, "-"),
           team_id: input.teamId.replace(/[^a-z0-9\-_]/gi, "-").toLowerCase(),
+          server_name: serverName.replace(/\./g, "-"), // Store the server name in labels
         },
         disks: [
           {
@@ -293,9 +276,21 @@ spec:
         - name: USER_ID
           value: "${userId}"
         - name: HF_TOKEN
-          value: "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" 
+          value: "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"
+        - name: SERVER_NAME
+          value: "${serverName}"
+      ports:
+        - containerPort: 443
+        - containerPort: 8000
+      volumeMounts:
+        - name: ssl-certs
+          mountPath: /etc/nginx/ssl
       stdin: false
       tty: false
+  volumes:
+    - name: ssl-certs
+      hostPath:
+        path: /tmp/ssl-certs-${vmName}
   restartPolicy: Always
               `,
             },
@@ -303,8 +298,24 @@ spec:
               key: "startup-script",
               value: `
 #!/bin/bash
-# Expose the API port
-iptables -w -A INPUT -p tcp --dport 8000 -j ACCEPT
+# Create directory for SSL certificates
+mkdir -p /tmp/ssl-certs-${vmName}
+
+# Fetch SSL certificates from Secret Manager
+echo "Fetching SSL certificates from Secret Manager..."
+gcloud secrets versions access latest --secret="wildcard-cert" > /tmp/ssl-certs-${vmName}/cert.pem
+gcloud secrets versions access latest --secret="wildcard-key" > /tmp/ssl-certs-${vmName}/key.pem
+
+# Set proper permissions
+chmod 600 /tmp/ssl-certs-${vmName}/*.pem
+
+# Expose the HTTPS port
+iptables -w -A INPUT -p tcp --dport 443 -j ACCEPT
+
+# Update DNS record
+# Note: You may want to implement this in a separate Cloud Function
+# for better separation of concerns
+echo "VM ${vmName} started with server name ${serverName}"
               `,
             },
           ],
@@ -345,16 +356,17 @@ iptables -w -A INPUT -p tcp --dport 8000 -j ACCEPT
 
       console.log("VM creation successful, operation ID:", response.data.id);
 
-      // Return the operation data
+      // Return the operation data with HTTPS endpoint
       return {
         status: "success",
         vmName: vmName,
         operationId: response.data.id || "unknown",
-        apiEndpoint: null, // Will be populated once VM is ready
+        apiEndpoint: `https://${serverName}`, // Now using HTTPS
         message: "VM creation initiated",
         organizationId,
         userId,
-        zone: zoneStr, // Include zone for status checks
+        zone: zoneStr,
+        serverName: serverName,
       };
     } catch (error) {
       console.error("Error creating VM:", error);

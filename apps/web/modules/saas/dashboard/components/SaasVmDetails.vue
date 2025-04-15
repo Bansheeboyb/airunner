@@ -1222,6 +1222,16 @@
       } else {
         // In production, make actual API call
         try {
+          // Check if the API endpoint is using HTTP instead of HTTPS while on a secure connection
+          const isHttpEndpoint = vm.value.apiEndpoint?.startsWith('http:');
+          const isSecureConnection = window.location.protocol === 'https:';
+          const isMixedContentIssue = isHttpEndpoint && isSecureConnection;
+          
+          if (isMixedContentIssue) {
+            console.warn("Mixed content issue detected: Attempting to access HTTP endpoint from HTTPS page");
+            throw new Error("Mixed Content: Your browser has blocked the request to an insecure (HTTP) API endpoint from a secure (HTTPS) page. The VM's API endpoint must use HTTPS.");
+          }
+          
           const response = await fetch(vm.value.apiEndpoint, {
             method: 'POST',
             headers: {
@@ -2525,6 +2535,25 @@
                   </div>
                 </div>
                 
+                <!-- Mixed Content Warning -->
+                <div v-if="vm.apiEndpoint?.startsWith('http:') && window.location.protocol === 'https:'" 
+                  class="p-3 bg-yellow-900/30 border-t border-yellow-800">
+                  <div class="flex items-start gap-2">
+                    <AlertCircleIcon class="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p class="text-sm font-medium text-yellow-300">Mixed Content Warning</p>
+                      <p class="text-xs text-yellow-400 mt-1">
+                        Your browser may block requests to this VM's HTTP endpoint from an HTTPS page. 
+                        For full functionality, either:
+                      </p>
+                      <ul class="text-xs text-yellow-400 mt-1 list-disc list-inside">
+                        <li>Configure your VM to use HTTPS instead of HTTP</li>
+                        <li>Access this dashboard using HTTP instead of HTTPS</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
                 <!-- Chat Input -->
                 <div class="p-4 border-t border-gray-800">
                   <form @submit.prevent="sendMessage" class="flex gap-2">
@@ -2549,9 +2578,16 @@
                       </svg>
                     </button>
                   </form>
-                  <p class="text-xs text-gray-500 mt-2">
-                    {{ vm.apiEndpoint ? 'Using endpoint: ' + vm.apiEndpoint : 'API endpoint not available' }}
-                  </p>
+                  <div class="flex items-center justify-between text-xs text-gray-500 mt-2">
+                    <p>
+                      {{ vm.apiEndpoint ? 'Using endpoint: ' + vm.apiEndpoint : 'API endpoint not available' }}
+                    </p>
+                    <div v-if="vm.apiEndpoint?.startsWith('http:') && window.location.protocol === 'https:'" 
+                      class="text-yellow-500 flex items-center">
+                      <AlertCircleIcon class="h-3 w-3 mr-1" />
+                      HTTP endpoint
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

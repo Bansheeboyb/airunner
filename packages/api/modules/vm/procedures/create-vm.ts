@@ -247,7 +247,7 @@ export const createVm = protectedProcedure
             autoDelete: true,
             initializeParams: {
               sourceImage: "projects/cos-cloud/global/images/family/cos-stable",
-              diskSizeGb: "30", // Increased to accommodate SSL certs
+              diskSizeGb: "50", // Increased to accommodate SSL certs
             },
           },
         ],

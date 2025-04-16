@@ -271,6 +271,8 @@ spec:
   containers:
     - image: gcr.io/${projectId}/phi-ssl-api:latest
       name: llm-container
+      securityContext:
+        privileged: true
       env:
         - name: MODEL_ID
           value: "microsoft/Phi-4-mini-instruct"
@@ -294,6 +296,8 @@ spec:
           value: "${input.cpuCount}"
         - name: TEMPERATURE
           value: "0.7"
+        - name: ENABLE_HTTPS
+          value: "true"
       ports:
         - containerPort: 80
         - containerPort: 443

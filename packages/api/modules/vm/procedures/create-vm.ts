@@ -160,8 +160,8 @@ export const createVm = protectedProcedure
         .replace(/[^a-z0-9\-]/g, "-");
 
       // Domain for the API server (used in SSL certs)
-      const serverName = `${randomId}.api.airunner.io`;
-      const dnsZone = "airunner"; // Your DNS zone in Cloud DNS
+      const serverName = `${randomId}.api.yourdomain.com`;
+      const dnsZone = "yourdomain-com"; // Your DNS zone in Cloud DNS
 
       // Add debug logging to check environment variables
       console.log("GCP Auth Status:", !!process.env.GCP_PRIVATE_KEY);
@@ -247,7 +247,7 @@ export const createVm = protectedProcedure
             autoDelete: true,
             initializeParams: {
               sourceImage: "projects/cos-cloud/global/images/family/cos-stable",
-              diskSizeGb: "50", // Increased to accommodate SSL certs
+              diskSizeGb: "30", // Increased to accommodate SSL certs
             },
           },
         ],
@@ -319,15 +319,26 @@ spec:
               key: "startup-script",
               value: `
 #!/bin/bash
+set -e
+set -x
+
+# Function to log with timestamps
+log() {
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+log "Starting VM initialization"
+
 # Create service account credentials for DNS validation
-echo "Setting up service account for DNS validation..."
+log "Setting up service account for DNS validation..."
 gcloud iam service-accounts keys create /tmp/gcp-credentials-${randomId}.json \\
-  --iam-account=${process.env.GCP_SERVICE_ACCOUNT_EMAIL}
+  --iam-account=${process.env.GCP_SERVICE_ACCOUNT_EMAIL} || log "Error creating service account key"
 
 # Fix permissions
 chmod 600 /tmp/gcp-credentials-${randomId}.json
 
 # Create firewall rules if they don't exist
+log "Setting up firewall rules..."
 # Allow HTTP, HTTPS and API port
 gcloud compute firewall-rules describe allow-http || \\
 gcloud compute firewall-rules create allow-http \\
@@ -356,7 +367,41 @@ gcloud compute firewall-rules create allow-phi-api \\
   --rules=tcp:8000 \\
   --source-ranges=0.0.0.0/0
 
-echo "VM ${vmName} started with server name ${serverName}"
+# Ensure Docker is functioning properly
+log "Verifying Docker is operational..."
+if ! docker info > /dev/null 2>&1; then
+  log "ERROR: Docker is not running properly!"
+  systemctl restart docker
+  sleep 5
+fi
+
+# Verify credential file exists with proper permissions
+log "Verifying credential file..."
+if [ -f "/tmp/gcp-credentials-${randomId}.json" ]; then
+  log "Credential file exists, checking permissions"
+  ls -la /tmp/gcp-credentials-${randomId}.json
+else
+  log "ERROR: Credential file not found, attempting to create again"
+  SERVICE_ACCOUNT=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email" -H "Metadata-Flavor: Google")
+  gcloud iam service-accounts keys create /tmp/gcp-credentials-${randomId}.json \\
+    --iam-account="$SERVICE_ACCOUNT" || log "Error creating service account key with default account"
+  chmod 600 /tmp/gcp-credentials-${randomId}.json
+fi
+
+# Stop any existing container to ensure clean start
+log "Stopping any existing containers"
+docker ps | grep llm-container && docker stop $(docker ps -q --filter "name=llm-container") || log "No containers to stop"
+docker ps -a | grep llm-container && docker rm $(docker ps -a -q --filter "name=llm-container") || log "No containers to remove"
+
+# Update IPtables to allow all needed traffic
+log "Updating IPtables firewall rules - allowing traffic on needed ports"
+iptables -w -A INPUT -p tcp --dport 8000 -j ACCEPT
+iptables -w -A INPUT -p tcp --dport 443 -j ACCEPT
+iptables -w -A INPUT -p tcp --dport 80 -j ACCEPT
+iptables -w -A INPUT -p udp --dport 53 -j ACCEPT
+
+log "VM ${vmName} started with server name ${serverName}"
+log "Setup complete! The application should be accessible soon."
               `,
             },
           ],

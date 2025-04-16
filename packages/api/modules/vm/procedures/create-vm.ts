@@ -140,10 +140,10 @@ export const createVm = protectedProcedure
       const organizationId = user.organizationId || "default-org";
       const userId = user.id;
 
-      // Generate a unique ID for the VM
+      // Generate a unique instance ID for the VM
       const timestamp = new Date().getTime();
-      const uniqueId = createHash("md5")
-        .update(`${input.modelName}-${timestamp}`)
+      const randomId = createHash("md5")
+        .update(`${input.modelName}-${timestamp}-${Math.random()}`)
         .digest("hex")
         .substring(0, 8);
 
@@ -152,13 +152,16 @@ export const createVm = protectedProcedure
         ? input.serverLabel.toLowerCase().replace(/[^a-z0-9\-]/g, "-")
         : input.modelName.toLowerCase().replace(/\s/g, "-");
 
-      const vmName = `llm-${serverPrefix}-${uniqueId}`;
+      const vmName = `llm-${serverPrefix}-${randomId}`;
 
       // Create a server name with organization ID included for better organization
       const normalizedOrgId = organizationId
         .toLowerCase()
         .replace(/[^a-z0-9\-]/g, "-");
-      const serverName = `${vmName}.${normalizedOrgId}.yourdomain.com`;
+
+      // Domain for the API server (used in SSL certs)
+      const serverName = `${randomId}.api.airunner.io`;
+      const dnsZone = "airunner"; // Your DNS zone in Cloud DNS
 
       // Add debug logging to check environment variables
       console.log("GCP Auth Status:", !!process.env.GCP_PRIVATE_KEY);
@@ -225,6 +228,7 @@ export const createVm = protectedProcedure
             "http-server",
             "https-server",
             `team-${input.teamId.replace(/[^a-z0-9\-_]/gi, "-").toLowerCase()}`,
+            `instance-${randomId}`, // For DNS and certificate automation
           ],
         },
         // Add labels for organization and user tracking
@@ -235,6 +239,7 @@ export const createVm = protectedProcedure
           model_name: input.modelName.toLowerCase().replace(/\s/g, "-"),
           team_id: input.teamId.replace(/[^a-z0-9\-_]/gi, "-").toLowerCase(),
           server_name: serverName.replace(/\./g, "-"), // Store the server name in labels
+          instance_id: randomId, // Store instance ID for reference
         },
         disks: [
           {
@@ -242,7 +247,7 @@ export const createVm = protectedProcedure
             autoDelete: true,
             initializeParams: {
               sourceImage: "projects/cos-cloud/global/images/family/cos-stable",
-              diskSizeGb: "20",
+              diskSizeGb: "30", // Increased to accommodate SSL certs
             },
           },
         ],
@@ -264,33 +269,45 @@ export const createVm = protectedProcedure
               value: `
 spec:
   containers:
-    - image: gcr.io/${projectId}/${input.modelName
-                .toLowerCase()
-                .replace(/\s/g, "-")}:latest
+    - image: gcr.io/${projectId}/phi-ssl-api:latest
       name: llm-container
       env:
-        - name: MODEL_NAME
-          value: "${input.modelName}"
+        - name: MODEL_ID
+          value: "microsoft/Phi-4-mini-instruct"
         - name: ORGANIZATION_ID
           value: "${organizationId}"
         - name: USER_ID
           value: "${userId}"
         - name: HF_TOKEN
-          value: "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"
-        - name: SERVER_NAME
+          value: "${process.env.HF_TOKEN || ""}"
+        - name: DOMAIN_NAME
           value: "${serverName}"
+        - name: DNS_ZONE
+          value: "${dnsZone}"
+        - name: GCP_PROJECT_ID
+          value: "${projectId}"
+        - name: MAX_INPUT_LENGTH
+          value: "4096"
+        - name: MAX_TOTAL_TOKENS
+          value: "8192"
+        - name: NUM_THREADS
+          value: "${input.cpuCount}"
+        - name: TEMPERATURE
+          value: "0.7"
       ports:
+        - containerPort: 80
         - containerPort: 443
         - containerPort: 8000
       volumeMounts:
-        - name: ssl-certs
-          mountPath: /etc/nginx/ssl
+        - name: gcp-credentials
+          mountPath: /app/gcp-credentials.json
+          readOnly: true
       stdin: false
       tty: false
   volumes:
-    - name: ssl-certs
+    - name: gcp-credentials
       hostPath:
-        path: /tmp/ssl-certs-${vmName}
+        path: /tmp/gcp-credentials-${randomId}.json
   restartPolicy: Always
               `,
             },
@@ -298,23 +315,43 @@ spec:
               key: "startup-script",
               value: `
 #!/bin/bash
-# Create directory for SSL certificates
-mkdir -p /tmp/ssl-certs-${vmName}
+# Create service account credentials for DNS validation
+echo "Setting up service account for DNS validation..."
+gcloud iam service-accounts keys create /tmp/gcp-credentials-${randomId}.json \\
+  --iam-account=${process.env.GCP_SERVICE_ACCOUNT_EMAIL}
 
-# Fetch SSL certificates from Secret Manager
-echo "Fetching SSL certificates from Secret Manager..."
-gcloud secrets versions access latest --secret="wildcard-cert" > /tmp/ssl-certs-${vmName}/cert.pem
-gcloud secrets versions access latest --secret="wildcard-key" > /tmp/ssl-certs-${vmName}/key.pem
+# Fix permissions
+chmod 600 /tmp/gcp-credentials-${randomId}.json
 
-# Set proper permissions
-chmod 600 /tmp/ssl-certs-${vmName}/*.pem
+# Create firewall rules if they don't exist
+# Allow HTTP, HTTPS and API port
+gcloud compute firewall-rules describe allow-http || \\
+gcloud compute firewall-rules create allow-http \\
+  --direction=INGRESS \\
+  --priority=1000 \\
+  --network=default \\
+  --action=ALLOW \\
+  --rules=tcp:80 \\
+  --source-ranges=0.0.0.0/0
 
-# Expose the HTTPS port
-iptables -w -A INPUT -p tcp --dport 443 -j ACCEPT
+gcloud compute firewall-rules describe allow-https || \\
+gcloud compute firewall-rules create allow-https \\
+  --direction=INGRESS \\
+  --priority=1000 \\
+  --network=default \\
+  --action=ALLOW \\
+  --rules=tcp:443 \\
+  --source-ranges=0.0.0.0/0
 
-# Update DNS record
-# Note: You may want to implement this in a separate Cloud Function
-# for better separation of concerns
+gcloud compute firewall-rules describe allow-phi-api || \\
+gcloud compute firewall-rules create allow-phi-api \\
+  --direction=INGRESS \\
+  --priority=1000 \\
+  --network=default \\
+  --action=ALLOW \\
+  --rules=tcp:8000 \\
+  --source-ranges=0.0.0.0/0
+
 echo "VM ${vmName} started with server name ${serverName}"
               `,
             },
@@ -367,6 +404,7 @@ echo "VM ${vmName} started with server name ${serverName}"
         userId,
         zone: zoneStr,
         serverName: serverName,
+        instanceId: randomId,
       };
     } catch (error) {
       console.error("Error creating VM:", error);

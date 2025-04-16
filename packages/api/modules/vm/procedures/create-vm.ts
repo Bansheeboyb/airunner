@@ -305,6 +305,7 @@ spec:
       volumeMounts:
         - name: gcp-credentials
           mountPath: /app/gcp-credentials.json
+          subPath: gcp-credentials.json
           readOnly: true
       stdin: false
       tty: false

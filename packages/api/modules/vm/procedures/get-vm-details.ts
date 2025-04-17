@@ -71,23 +71,20 @@ export const getVmDetails = protectedProcedure
       const isRunning = vm.status === "RUNNING";
       let apiEndpoint = null;
 
-      // Extract external IP if VM is running
-      if (
-        isRunning &&
-        vm.networkInterfaces &&
-        vm.networkInterfaces.length > 0
-      ) {
-        const networkInterface = vm.networkInterfaces[0];
-
-        if (
-          networkInterface.accessConfigs &&
-          networkInterface.accessConfigs.length > 0
+      // Use instance_id label if available, otherwise fall back to IP
+      if (isRunning) {
+        if (vm.labels && vm.labels.instance_id) {
+          apiEndpoint = `http://${vm.labels.instance_id}:8000/api/generate`;
+        } else if (
+          vm.networkInterfaces &&
+          vm.networkInterfaces.length > 0 &&
+          vm.networkInterfaces[0].accessConfigs &&
+          vm.networkInterfaces[0].accessConfigs.length > 0 &&
+          vm.networkInterfaces[0].accessConfigs[0].natIP
         ) {
-          const accessConfig = networkInterface.accessConfigs[0];
-
-          if (accessConfig.natIP) {
-            apiEndpoint = `http://${accessConfig.natIP}:8000/api/generate`;
-          }
+          // Fallback to IP if no instance_id label
+          const accessConfig = vm.networkInterfaces[0].accessConfigs[0];
+          apiEndpoint = `http://${accessConfig.natIP}:8000/api/generate`;
         }
       }
 

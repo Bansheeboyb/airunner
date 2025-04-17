@@ -160,8 +160,8 @@ export const createVm = protectedProcedure
         .replace(/[^a-z0-9\-]/g, "-");
 
       // Domain for the API server (used in SSL certs)
-      const serverName = `${randomId}.api.yourdomain.com`;
-      const dnsZone = "yourdomain-com"; // Your DNS zone in Cloud DNS
+      const serverName = `${randomId}.airunner.io`;
+      const dnsZone = "airunner"; // Your DNS zone in Cloud DNS
 
       // Add debug logging to check environment variables
       console.log("GCP Auth Status:", !!process.env.GCP_PRIVATE_KEY);

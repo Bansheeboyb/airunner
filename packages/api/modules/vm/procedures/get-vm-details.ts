@@ -73,8 +73,12 @@ export const getVmDetails = protectedProcedure
 
       // Use instance_id label if available, otherwise fall back to IP
       if (isRunning) {
-        if (vm.labels && vm.labels.instance_id) {
+        console.log("VM labels:", vm.labels);
+        
+        if (vm.labels && 'instance_id' in vm.labels) {
+          console.log("Found instance_id label:", vm.labels.instance_id);
           apiEndpoint = `http://${vm.labels.instance_id}:8000/api/generate`;
+          console.log("Using instance_id for apiEndpoint:", apiEndpoint);
         } else if (
           vm.networkInterfaces &&
           vm.networkInterfaces.length > 0 &&
@@ -85,6 +89,7 @@ export const getVmDetails = protectedProcedure
           // Fallback to IP if no instance_id label
           const accessConfig = vm.networkInterfaces[0].accessConfigs[0];
           apiEndpoint = `http://${accessConfig.natIP}:8000/api/generate`;
+          console.log("Falling back to IP for apiEndpoint:", apiEndpoint);
         }
       }
 

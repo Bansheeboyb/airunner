@@ -72,15 +72,12 @@ export const checkVmStatus = protectedProcedure
       // Use instance_id label if available, otherwise fall back to IP
       if (isRunning) {
         console.log("VM labels:", vm.labels);
-        
-        if (vm.labels && 'instance_id' in vm.labels) {
+
+        if (vm.labels && "instance_id" in vm.labels) {
           console.log("Found instance_id label:", vm.labels.instance_id);
           apiEndpoint = `http://${vm.labels.instance_id}:8000/api/generate`;
           console.log("Using instance_id for apiEndpoint:", apiEndpoint);
-        } else if (
-          vm.networkInterfaces &&
-          vm.networkInterfaces.length > 0
-        ) {
+        } else if (vm.networkInterfaces && vm.networkInterfaces.length > 0) {
           console.log("Network interfaces available");
           const networkInterface = vm.networkInterfaces[0];
           console.log("Network interface keys:", Object.keys(networkInterface));
@@ -94,7 +91,7 @@ export const checkVmStatus = protectedProcedure
             console.log("External IP:", accessConfig.natIP);
 
             if (accessConfig.natIP) {
-              apiEndpoint = `http://${accessConfig.natIP}:8000/api/generate`;
+              apiEndpoint = `https://${accessConfig.natIP}.airunner.io/api/generate`;
               console.log("Using IP for apiEndpoint:", apiEndpoint);
             }
           } else {
@@ -120,7 +117,7 @@ export const checkVmStatus = protectedProcedure
           console.log("Extracted instance ID from selfLink:", instanceId);
         }
       }
-      
+
       // Return a safer, more structured response with instanceId
       return {
         status: "success",

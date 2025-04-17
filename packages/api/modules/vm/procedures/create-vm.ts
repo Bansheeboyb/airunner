@@ -302,17 +302,8 @@ spec:
         - containerPort: 80
         - containerPort: 443
         - containerPort: 8000
-      volumeMounts:
-        - name: gcp-credentials
-          mountPath: /app/gcp-credentials.json
-          subPath: gcp-credentials.json
-          readOnly: true
       stdin: false
       tty: false
-  volumes:
-    - name: gcp-credentials
-      hostPath:
-        path: /tmp/gcp-credentials-${randomId}.json
   restartPolicy: Always
               `,
             },
@@ -333,7 +324,9 @@ log "Starting VM initialization"
 # Create service account credentials for DNS validation
 log "Setting up service account for DNS validation..."
 gcloud iam service-accounts keys create /tmp/gcp-credentials-${randomId}.json \\
-  --iam-account=${process.env.GCP_SERVICE_ACCOUNT_EMAIL} || log "Error creating service account key"
+  --iam-account=${
+    process.env.GCP_SERVICE_ACCOUNT_EMAIL
+  } || log "Error creating service account key"
 
 # Fix permissions
 chmod 600 /tmp/gcp-credentials-${randomId}.json
@@ -376,18 +369,18 @@ if ! docker info > /dev/null 2>&1; then
   sleep 5
 fi
 
-# Verify credential file exists with proper permissions
-log "Verifying credential file..."
-if [ -f "/tmp/gcp-credentials-${randomId}.json" ]; then
-  log "Credential file exists, checking permissions"
-  ls -la /tmp/gcp-credentials-${randomId}.json
-else
-  log "ERROR: Credential file not found, attempting to create again"
-  SERVICE_ACCOUNT=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email" -H "Metadata-Flavor: Google")
-  gcloud iam service-accounts keys create /tmp/gcp-credentials-${randomId}.json \\
-    --iam-account="$SERVICE_ACCOUNT" || log "Error creating service account key with default account"
-  chmod 600 /tmp/gcp-credentials-${randomId}.json
-fi
+# Create the service account credentials directly (no volume mounting)
+log "Creating service account credentials file..."
+SERVICE_ACCOUNT=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email" -H "Metadata-Flavor: Google")
+TEMP_CREDS="/tmp/temp-creds-${randomId}.json"
+
+gcloud iam service-accounts keys create $TEMP_CREDS \\
+  --iam-account="${
+    process.env.GCP_SERVICE_ACCOUNT_EMAIL
+  }" || log "Error creating service account key"
+chmod 600 $TEMP_CREDS
+
+# The credentials will be injected directly into the container when it starts
 
 # Stop any existing container to ensure clean start
 log "Stopping any existing containers"
@@ -400,6 +393,40 @@ iptables -w -A INPUT -p tcp --dport 8000 -j ACCEPT
 iptables -w -A INPUT -p tcp --dport 443 -j ACCEPT
 iptables -w -A INPUT -p tcp --dport 80 -j ACCEPT
 iptables -w -A INPUT -p udp --dport 53 -j ACCEPT
+
+# Start the container and inject the credentials 
+log "Starting container and copying credentials..."
+
+# Run the container
+CONTAINER_ID=$(docker run -d \\
+  --name llm-container \\
+  --restart unless-stopped \\
+  -p 80:80 -p 443:443 -p 8000:8000 \\
+  -e MODEL_ID="microsoft/Phi-4-mini-instruct" \\
+  -e ORGANIZATION_ID="${organizationId}" \\
+  -e USER_ID="${userId}" \\
+  -e HF_TOKEN="${process.env.HF_TOKEN || ""}" \\
+  -e DOMAIN_NAME="${serverName}" \\
+  -e DNS_ZONE="${dnsZone}" \\
+  -e GCP_PROJECT_ID="${projectId}" \\
+  -e MAX_INPUT_LENGTH="4096" \\
+  -e MAX_TOTAL_TOKENS="8192" \\
+  -e NUM_THREADS="${input.cpuCount}" \\
+  -e TEMPERATURE="0.7" \\
+  -e ENABLE_HTTPS="true" \\
+  gcr.io/${projectId}/phi-ssl-api:latest)
+
+if [ -n "$CONTAINER_ID" ]; then
+  log "Container started with ID: $CONTAINER_ID"
+  
+  # Copy the credentials directly into the container
+  sleep 3  # Give container time to initialize
+  docker cp $TEMP_CREDS $CONTAINER_ID:/app/gcp-credentials.json
+  docker exec $CONTAINER_ID chmod 600 /app/gcp-credentials.json
+  log "Credentials copied into container"
+else
+  log "ERROR: Failed to start container"
+fi
 
 log "VM ${vmName} started with server name ${serverName}"
 log "Setup complete! The application should be accessible soon."

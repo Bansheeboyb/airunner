@@ -69,32 +69,42 @@ export const checkVmStatus = protectedProcedure
       const isRunning = vm.status === "RUNNING";
       let apiEndpoint = null;
 
-      // Extract external IP if VM is running
-      if (
-        isRunning &&
-        vm.networkInterfaces &&
-        vm.networkInterfaces.length > 0
-      ) {
-        console.log("Network interfaces available");
-        const networkInterface = vm.networkInterfaces[0];
-        console.log("Network interface keys:", Object.keys(networkInterface));
-
-        if (
-          networkInterface.accessConfigs &&
-          networkInterface.accessConfigs.length > 0
+      // Use instance_id label if available, otherwise fall back to IP
+      if (isRunning) {
+        console.log("VM labels:", vm.labels);
+        
+        if (vm.labels && 'instance_id' in vm.labels) {
+          console.log("Found instance_id label:", vm.labels.instance_id);
+          apiEndpoint = `http://${vm.labels.instance_id}:8000/api/generate`;
+          console.log("Using instance_id for apiEndpoint:", apiEndpoint);
+        } else if (
+          vm.networkInterfaces &&
+          vm.networkInterfaces.length > 0
         ) {
-          console.log("Access configs available");
-          const accessConfig = networkInterface.accessConfigs[0];
-          console.log("External IP:", accessConfig.natIP);
+          console.log("Network interfaces available");
+          const networkInterface = vm.networkInterfaces[0];
+          console.log("Network interface keys:", Object.keys(networkInterface));
 
-          if (accessConfig.natIP) {
-            apiEndpoint = `http://${accessConfig.natIP}:8000/api/generate`;
+          if (
+            networkInterface.accessConfigs &&
+            networkInterface.accessConfigs.length > 0
+          ) {
+            console.log("Access configs available");
+            const accessConfig = networkInterface.accessConfigs[0];
+            console.log("External IP:", accessConfig.natIP);
+
+            if (accessConfig.natIP) {
+              apiEndpoint = `http://${accessConfig.natIP}:8000/api/generate`;
+              console.log("Using IP for apiEndpoint:", apiEndpoint);
+            }
+          } else {
+            console.log("No access configs found");
           }
         } else {
-          console.log("No access configs found");
+          console.log("No network interfaces found");
         }
       } else {
-        console.log("VM not running or no network interfaces found");
+        console.log("VM not running");
       }
 
       // Extract the instance ID from the vm.id or selfLink

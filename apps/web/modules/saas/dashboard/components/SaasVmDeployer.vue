@@ -207,6 +207,13 @@
   const deployModel = async () => {
     try {
       error.value = null;
+      
+      // Validate API key selection
+      if (!deploymentConfig.value.apiKeyId) {
+        error.value = "Please select an API key for VM authentication";
+        return;
+      }
+      
       isDeploying.value = true;
 
       // Call the API endpoint using apiCaller
@@ -220,7 +227,7 @@
           : undefined,
         region: deploymentConfig.value.region,
         teamId: currentTeam.value?.id || "1",
-        apiKeyId: deploymentConfig.value.apiKeyId, // Include API key ID
+        apiKeyId: deploymentConfig.value.apiKeyId, // Pass the selected API key ID
       });
 
       vmName.value = result.vmName;

@@ -1,8 +1,10 @@
 import { z } from "zod";
 import { protectedProcedure } from "../../trpc";
 import { google } from "googleapis";
-import { createHash } from "crypto";
+import { createHash, createDecipheriv } from "crypto";
 import { JWT } from "google-auth-library";
+import { db } from "database";
+import { TRPCError } from "@trpc/server";
 
 // Add a status check procedure
 export const checkVmStatus = protectedProcedure
@@ -119,6 +121,23 @@ export const checkVmStatus = protectedProcedure
     }
   });
 
+// Function to decrypt an API key (based on get-decrypted-api-key.ts)
+function decryptApiKey(encryptedApiKey: string): string {
+  const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+  const ENCRYPTION_IV = process.env.ENCRYPTION_IV;
+  
+  const decipher = createDecipheriv(
+    "aes-256-cbc",
+    Buffer.from(ENCRYPTION_KEY, "hex"),
+    Buffer.from(ENCRYPTION_IV, "hex"),
+  );
+
+  let decrypted = decipher.update(encryptedApiKey, "hex", "utf8");
+  decrypted += decipher.final("utf8");
+
+  return decrypted;
+}
+
 export const createVm = protectedProcedure
   .input(
     z.object({
@@ -131,6 +150,10 @@ export const createVm = protectedProcedure
       teamId: z.string(),
       // Optional server label for custom naming
       serverLabel: z.string().optional(),
+      // API key for authentication
+      apiKey: z.string().optional(),
+      // API key ID - this will take precedence over apiKey if provided
+      apiKeyId: z.string().optional(),
     }),
   )
   .mutation(async ({ input, ctx }) => {
@@ -160,8 +183,64 @@ export const createVm = protectedProcedure
         .replace(/[^a-z0-9\-]/g, "-");
 
       // Domain for the API server (used in SSL certs)
-      const serverName = `${randomId}.airunner.io`;
+      const serverName = `${randomId}.api.airunner.io`;
       const dnsZone = "airunner"; // Your DNS zone in Cloud DNS
+
+      // Resolve API key - if apiKeyId is provided, fetch and decrypt the key
+      let apiKey: string;
+      
+      if (input.apiKeyId) {
+        // Fetch the API key from the database
+        const apiKeyRecord = await db.apiKey.findUnique({
+          where: { id: input.apiKeyId },
+        });
+        
+        if (!apiKeyRecord) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "API key not found",
+          });
+        }
+        
+        // Verify permissions
+        if (apiKeyRecord.type === "PERSONAL") {
+          if (apiKeyRecord.userId !== ctx.user.id) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: "No permission to use this API key",
+            });
+          }
+        } else if (apiKeyRecord.type === "TEAM") {
+          if (apiKeyRecord.teamId !== input.teamId || !ctx.abilities.canAccessTeam(apiKeyRecord.teamId)) {
+            throw new TRPCError({
+              code: "UNAUTHORIZED", 
+              message: "No permission to use this team's API key",
+            });
+          }
+        }
+        
+        // Decrypt the API key
+        apiKey = decryptApiKey(apiKeyRecord.encryptedKey);
+        
+        // Update last used timestamp
+        await db.apiKey.update({
+          where: { id: input.apiKeyId },
+          data: { lastUsedAt: new Date() },
+        });
+        
+        console.log(`Using existing API key "${apiKeyRecord.name}" for VM ${vmName}`);
+      } else if (input.apiKey) {
+        // Use the provided API key directly
+        apiKey = input.apiKey;
+        console.log("Using provided API key for VM");
+      } else {
+        // Generate a random API key
+        apiKey = createHash("sha256")
+          .update(`${organizationId}-${userId}-${randomId}-${Date.now()}`)
+          .digest("hex")
+          .substring(0, 32);
+        console.log("Generated new random API key for VM");
+      }
 
       // Add debug logging to check environment variables
       console.log("GCP Auth Status:", !!process.env.GCP_PRIVATE_KEY);
@@ -298,6 +377,8 @@ spec:
           value: "0.7"
         - name: ENABLE_HTTPS
           value: "true"
+        - name: API_KEY
+          value: "${apiKey}"
       ports:
         - containerPort: 80
         - containerPort: 443
@@ -414,6 +495,7 @@ CONTAINER_ID=$(docker run -d \\
   -e NUM_THREADS="${input.cpuCount}" \\
   -e TEMPERATURE="0.7" \\
   -e ENABLE_HTTPS="true" \\
+  -e API_KEY="${apiKey}" \\
   gcr.io/${projectId}/phi-ssl-api:latest)
 
 if [ -n "$CONTAINER_ID" ]; then
@@ -482,6 +564,7 @@ log "Setup complete! The application should be accessible soon."
         zone: zoneStr,
         serverName: serverName,
         instanceId: randomId,
+        apiKey: apiKey, // Return the API key to the caller
       };
     } catch (error) {
       console.error("Error creating VM:", error);

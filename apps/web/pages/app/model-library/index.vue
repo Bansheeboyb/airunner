@@ -1,4 +1,6 @@
 <script setup lang="ts">
+  import SaasVmDeployer from "~/modules/saas/dashboard/components/SaasVmDeployer.vue";
+
   definePageMeta({
     layout: "saas-app",
   });
@@ -16,7 +18,7 @@
     >
       <div>
         <p class="mb-4"></p>
-        <SaasProductNameGenerator />
+        <SaasVmDeployer />
       </div>
     </div>
   </div>

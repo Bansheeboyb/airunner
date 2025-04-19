@@ -166,7 +166,14 @@ export const sendVmMessage = protectedProcedure
       ) {
         // Fall back to IP if no instance_id label
         const accessConfig = vm.networkInterfaces[0].accessConfigs[0];
+        
+        // Use HTTP endpoint to avoid SSL certificate validation issues
         apiEndpoint = `http://${accessConfig.natIP}:8000/api/generate`;
+        
+        // Get API endpoint directly from VM labels if available
+        if (vm.labels && "api_endpoint" in vm.labels) {
+          apiEndpoint = vm.labels.api_endpoint;
+        }
       }
 
       if (!apiEndpoint) {
@@ -188,37 +195,129 @@ export const sendVmMessage = protectedProcedure
       };
 
       // Send request to the VM with the API key for authentication
-      console.log("Sending request to VM API endpoint");
-      const response = await fetch(apiEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-API-Key": apiKey, // Use X-API-Key header for authentication
-        },
-        body: JSON.stringify(payload),
-        timeout: 60000, // 60 second timeout for longer responses
-      });
-
-      // Handle response
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Error from VM API: ${response.status} - ${errorText}`);
+      console.log(`Sending request to VM API endpoint: ${apiEndpoint}`);
+      console.log(`Request payload: ${JSON.stringify(payload)}`);
+      console.log(`Using X-API-Key authentication (key prefix: ${apiKey.substring(0, 5)}...)`);
+      
+      // Get agent package version (node-fetch might vary by environment)
+      const agent = typeof process !== 'undefined' && process.versions 
+        ? `Node.js ${process.version}` 
+        : 'unknown';
+      
+      let response;
+      try {
+        response = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": apiKey, // Use X-API-Key header for authentication
+            "User-Agent": `AIRunner/1.0 (${agent})`,
+          },
+          body: JSON.stringify(payload),
+          timeout: 60000, // 60 second timeout for longer responses
+        });
+        console.log(`Response status: ${response.status} ${response.statusText}`);
+      } catch (fetchError) {
+        console.error("Network error during fetch:", fetchError);
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `Error from VM: ${response.statusText} (${response.status})`,
+          message: `Network error connecting to VM: ${fetchError.message}`,
         });
       }
 
-      // Parse and return the VM's response
-      const result = await response.json();
-      console.log("Received response from VM API");
+      // Handle response - provide specific error messages for common issues
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error from VM API: ${response.status} - ${errorText}`);
+        
+        // Handle specific HTTP error codes
+        if (response.status === 401 || response.status === 403) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Unauthorized: The API key was rejected. Check that the API key is correct and active.",
+          });
+        } else if (response.status === 404) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "The VM API endpoint could not be found. It may be unavailable or misconfigured.",
+          });
+        } else if (response.status === 429) {
+          throw new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Rate limit exceeded. Please try again later.",
+          });
+        } else if (response.status >= 500) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "The VM server encountered an error. Please try again later.",
+          });
+        } else {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Error from VM: ${response.statusText || 'Unknown error'} (${response.status})`,
+          });
+        }
+      }
 
+      // Parse and return the VM's response
+      let result;
+      try {
+        const responseText = await response.text();
+        console.log("Received raw response:", responseText);
+        
+        // Try to parse as JSON, but handle text responses too
+        try {
+          result = JSON.parse(responseText);
+        } catch (e) {
+          // If it's not valid JSON, use the raw text as the response
+          console.log("Response was not valid JSON, using as raw text");
+          return {
+            text: responseText,
+            usage: null,
+            model: vm.labels?.model_name || "unknown",
+          };
+        }
+      } catch (error) {
+        console.error("Error parsing response:", error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Error parsing response: ${error.message}`,
+        });
+      }
+      
+      console.log("Parsed response from VM API:", result);
+      
+      // Extract the actual text from whichever field it's in
+      let responseText = null;
+      
+      if (typeof result === 'string') {
+        // If the result is just a string
+        responseText = result;
+      } else if (result.text !== undefined) {
+        responseText = result.text;
+      } else if (result.generated_text !== undefined) {
+        responseText = result.generated_text;
+      } else if (result.output !== undefined) {
+        responseText = result.output;
+      } else if (result.response !== undefined) {
+        responseText = result.response;
+      } else if (result.choices && result.choices.length > 0) {
+        // OpenAI format
+        responseText = result.choices[0].message?.content || result.choices[0].text;
+      } else if (result.content !== undefined) {
+        responseText = result.content;
+      } else if (result.message !== undefined) {
+        responseText = result.message;
+      } else if (result.generation !== undefined) {
+        responseText = result.generation;
+      } else {
+        // Fallback to stringify the whole response
+        console.warn("Unknown response format:", result);
+        responseText = JSON.stringify(result);
+      }
+      
       return {
-        text:
-          result.text ||
-          result.generated_text ||
-          result.output ||
-          result.response,
+        text: responseText,
         usage: result.usage || null,
         model: result.model || vm.labels?.model_name || "unknown",
       };

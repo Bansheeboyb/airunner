@@ -1214,32 +1214,49 @@
         // Use our secure server-side proxy instead of direct API call
         try {
           // Call the server-side proxy endpoint with API key ID
-          const result = await apiCaller.vm.sendVmMessage.mutate({
-            vmId: props.vmId, // Use the VM ID from props
-            message: userText, // The user's message text
-            apiKeyId: selectedApiKeyId.value, // Selected API key ID
-            // Include optional parameters
-            temperature: temperature.value,
-            maxTokens: maxTokens.value,
-            systemPrompt: systemRole.value || undefined,
-          });
-          
-          console.log("Server response:", result);
-          
-          // Find the placeholder message and update it with the response
-          const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
-          if (index !== -1) {
-            chatMessages.value[index] = {
-              role: 'assistant',
-              content: result.text || 'No response content',
-              model: result.model,
-              timestamp: new Date().toISOString()
-            };
-          }
-          
-          // If no response received, show error
-          if (!result.text) {
-            chatError.value = "Received empty response from the model";
+          try {
+            const result = await apiCaller.vm.sendVmMessage.mutate({
+              vmId: props.vmId, // Use the VM ID from props
+              message: userText, // The user's message text
+              apiKeyId: selectedApiKeyId.value, // Selected API key ID
+              // Include optional parameters
+              temperature: temperature.value,
+              maxTokens: maxTokens.value,
+              systemPrompt: systemRole.value || undefined,
+            });
+            
+            console.log("Server response:", result);
+            
+            // Find the placeholder message and update it with the response
+            const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
+            if (index !== -1) {
+              chatMessages.value[index] = {
+                role: 'assistant',
+                content: result?.text || 'No response content',
+                model: result?.model,
+                timestamp: new Date().toISOString()
+              };
+            }
+            
+            // If no response received, show error
+            if (!result || !result.text) {
+              chatError.value = "Received empty response from the model";
+            }
+          } catch (apiError) {
+            console.error("TRPC API error:", apiError);
+            
+            // Find the placeholder message and update it with error
+            const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
+            if (index !== -1) {
+              chatMessages.value[index] = {
+                role: 'assistant',
+                content: 'There was an error processing your request. The server may be experiencing issues.',
+                isError: true,
+                timestamp: new Date().toISOString()
+              };
+            }
+            
+            throw apiError; // Re-throw to be caught by the outer catch block
           }
         } catch (error) {
           console.error('Error calling VM API:', error);

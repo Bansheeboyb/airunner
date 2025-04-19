@@ -193,7 +193,7 @@ export const sendVmMessage = protectedProcedure
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+          "X-API-Key": apiKey, // Use X-API-Key header for authentication
         },
         body: JSON.stringify(payload),
         timeout: 60000, // 60 second timeout for longer responses

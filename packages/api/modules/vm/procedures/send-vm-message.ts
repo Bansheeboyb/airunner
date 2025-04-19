@@ -340,14 +340,14 @@ export const sendVmMessage = protectedProcedure
       }
       
       // Return a standardized structure with the extracted data
-      const response = {
+      const responseData = {
         text: responseText,
         usage: usage,
         model: modelInfo,
       };
       
-      console.log("Returning response object:", response);
-      return response;
+      console.log("Returning response object:", responseData);
+      return responseData;
     } catch (error) {
       console.error("Error in sendVmMessage:", error);
 

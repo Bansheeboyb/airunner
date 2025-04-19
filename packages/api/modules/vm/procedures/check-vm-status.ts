@@ -75,7 +75,7 @@ export const checkVmStatus = protectedProcedure
 
         if (vm.labels && "instance_id" in vm.labels) {
           console.log("Found instance_id label:", vm.labels.instance_id);
-          apiEndpoint = `https://${vm.labels.instance_id}.airunner.io/api/generate`;
+          apiEndpoint = `https://${vm.labels.instance_id}.api.airunner.io/api/generate`;
           console.log("Using instance_id for apiEndpoint:", apiEndpoint);
         } else if (vm.networkInterfaces && vm.networkInterfaces.length > 0) {
           console.log("Network interfaces available");

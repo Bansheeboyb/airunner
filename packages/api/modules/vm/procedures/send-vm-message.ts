@@ -287,40 +287,67 @@ export const sendVmMessage = protectedProcedure
       
       console.log("Parsed response from VM API:", result);
       
+      // First, let's log the entire response structure to help debug
+      console.log("Full response structure:", JSON.stringify(result, null, 2));
+      
       // Extract the actual text from whichever field it's in
       let responseText = null;
+      let usage = null;
+      let modelInfo = vm.labels?.model_name || "unknown";
       
-      if (typeof result === 'string') {
+      // Directly handle the Phi model format which uses generated_text
+      if (result && typeof result === 'object') {
+        // Standard fields
+        if (result.generated_text !== undefined) {
+          responseText = result.generated_text;
+        } else if (result.text !== undefined) {
+          responseText = result.text;
+        } else if (result.output !== undefined) {
+          responseText = result.output;
+        } else if (result.response !== undefined) {
+          responseText = result.response;
+        } else if (result.content !== undefined) {
+          responseText = result.content;
+        } else if (result.message !== undefined) {
+          responseText = result.message;
+        } else if (result.generation !== undefined) {
+          responseText = result.generation;
+        } else if (result.choices && result.choices.length > 0) {
+          // OpenAI format
+          responseText = result.choices[0].message?.content || result.choices[0].text;
+        } 
+        
+        // Get model info if available
+        if (result.model) {
+          modelInfo = result.model;
+        } else if (result.model_id) {
+          modelInfo = result.model_id;
+        }
+        
+        // Get usage info if available
+        if (result.usage) {
+          usage = result.usage;
+        }
+      } else if (typeof result === 'string') {
         // If the result is just a string
         responseText = result;
-      } else if (result.text !== undefined) {
-        responseText = result.text;
-      } else if (result.generated_text !== undefined) {
-        responseText = result.generated_text;
-      } else if (result.output !== undefined) {
-        responseText = result.output;
-      } else if (result.response !== undefined) {
-        responseText = result.response;
-      } else if (result.choices && result.choices.length > 0) {
-        // OpenAI format
-        responseText = result.choices[0].message?.content || result.choices[0].text;
-      } else if (result.content !== undefined) {
-        responseText = result.content;
-      } else if (result.message !== undefined) {
-        responseText = result.message;
-      } else if (result.generation !== undefined) {
-        responseText = result.generation;
-      } else {
-        // Fallback to stringify the whole response
-        console.warn("Unknown response format:", result);
+      }
+      
+      // If we still don't have a response text, use the entire result
+      if (!responseText) {
+        console.warn("Unknown response format, using full response:", result);
         responseText = JSON.stringify(result);
       }
       
-      return {
+      // Return a standardized structure with the extracted data
+      const response = {
         text: responseText,
-        usage: result.usage || null,
-        model: result.model || vm.labels?.model_name || "unknown",
+        usage: usage,
+        model: modelInfo,
       };
+      
+      console.log("Returning response object:", response);
+      return response;
     } catch (error) {
       console.error("Error in sendVmMessage:", error);
 

@@ -1225,22 +1225,34 @@
               systemPrompt: systemRole.value || undefined,
             });
             
-            console.log("Server response:", result);
+            console.log("Raw server response:", JSON.stringify(result, null, 2));
             
             // Find the placeholder message and update it with the response
             const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
             if (index !== -1) {
-              chatMessages.value[index] = {
-                role: 'assistant',
-                content: result?.text || 'No response content',
-                model: result?.model,
-                timestamp: new Date().toISOString()
-              };
+              // Check if we have a valid response
+              if (result && typeof result === 'object') {
+                // Update the message with the response text
+                chatMessages.value[index] = {
+                  role: 'assistant',
+                  content: result.text || 'No response content',
+                  model: result.model,
+                  usage: result.usage,
+                  timestamp: new Date().toISOString()
+                };
+              } else {
+                // Handle unexpected response format
+                chatMessages.value[index] = {
+                  role: 'assistant',
+                  content: typeof result === 'string' ? result : 'Received unexpected response format from the model',
+                  timestamp: new Date().toISOString()
+                };
+              }
             }
             
-            // If no response received, show error
-            if (!result || !result.text) {
-              chatError.value = "Received empty response from the model";
+            // If no valid response, show error
+            if (!result || (typeof result === 'object' && !result.text)) {
+              chatError.value = "Received empty or invalid response from the model";
             }
           } catch (apiError) {
             console.error("TRPC API error:", apiError);

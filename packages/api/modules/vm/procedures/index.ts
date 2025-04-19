@@ -7,3 +7,4 @@ export { startVm } from "./start-vm";
 export { stopVm } from "./stop-vm";
 export { getVmDetails } from "./get-vm-details";
 export { getVmLogs } from "./get-vm-logs";
+export { sendVmMessage } from "./send-vm-message";

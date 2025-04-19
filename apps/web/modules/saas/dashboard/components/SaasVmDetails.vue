@@ -1097,6 +1097,33 @@
   const isSettingsOpen = ref(false);
   const isDownloadingChat = ref(false);
   const isClearingChat = ref(false);
+  
+  // API Keys state and functions
+  const apiKeys = ref<any[]>([]);
+  const selectedApiKeyId = ref<string | null>(null);
+  const isLoadingApiKeys = ref(false);
+
+  // Load API keys
+  const loadApiKeys = async () => {
+    isLoadingApiKeys.value = true;
+    try {
+      const result = await apiCaller.team.listApiKeys.query({
+        type: "ALL",
+        teamId: currentTeam.value?.id,
+      });
+      apiKeys.value = result;
+      
+      // Select first key by default if available
+      if (result.length > 0 && !selectedApiKeyId.value) {
+        selectedApiKeyId.value = result[0].id;
+      }
+    } catch (error: any) {
+      console.error("Error loading API keys:", error);
+      chatError.value = `Failed to load API keys: ${error.message}`;
+    } finally {
+      isLoadingApiKeys.value = false;
+    }
+  };
   const modelCategory = computed(() => {
     return vm.value?.modelDetails?.category || 'AI Model';
   });
@@ -1117,8 +1144,14 @@
   // Send a message to the AI model
   const sendMessage = async () => {
     if (!userInput.value.trim() || isSendingMessage.value) return;
-    if (!vm.value?.apiEndpoint || vm.value?.status !== 'RUNNING') {
+    if (vm.value?.status !== 'RUNNING') {
       chatError.value = 'The VM must be running to use the model.';
+      return;
+    }
+    
+    // Validate API key selection
+    if (!selectedApiKeyId.value) {
+      chatError.value = 'Please select an API key in the settings panel.';
       return;
     }
     
@@ -1148,55 +1181,13 @@
         timestamp: new Date().toISOString()
       });
       
-      // Determine the model type to adjust request format
-      const modelName = vm.value?.labels?.model_name?.toLowerCase() || '';
-      let requestPayload;
-      
-      // Create message history based on model type
-      if (modelName.includes('phi')) {
-        // Phi-specific format using the last user message as prompt
-        requestPayload = {
-          prompt: userText,
-          system_prompt: systemRole.value,
-          temperature: temperature.value,
-          max_tokens: maxTokens.value
-        };
-      } else if (modelName.includes('llama') || modelName.includes('mistral')) {
-        // Some Llama.cpp and Mistral models use this format
-        const userPrompt = userText;
-        requestPayload = {
-          prompt: userPrompt,
-          temperature: temperature.value,
-          max_tokens: maxTokens.value,
-          system_prompt: systemRole.value
-        };
-      } else {
-        // Standard OpenAI-compatible format (Claude, OpenAI, etc.)
-        const messages = chatMessages.value
-          .filter(msg => msg.role !== 'system' && (!msg.isTyping || msg.role !== 'assistant'))
-          .map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }));
-          
-        // Add system message as the first message
-        messages.unshift({
-          role: 'system',
-          content: systemRole.value
-        });
-        
-        requestPayload = {
-          messages,
-          temperature: temperature.value,
-          max_tokens: maxTokens.value,
-          model: vm.value?.labels?.model_name || 'default'
-        };
+      // Auto-scroll to bottom to show typing indicator
+      if (messagesEnd.value) {
+        messagesEnd.value.scrollIntoView({ behavior: 'smooth' });
       }
       
-      console.log("Using request payload format:", requestPayload);
-      
-      // In development mode, use mock responses
-      if (process.env.NODE_ENV === 'development') {
+      // In development mode, use mock responses (if needed)
+      if (process.env.NODE_ENV === 'development' && false) { // Set to false to test real API
         // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
         
@@ -1220,64 +1211,35 @@
           };
         }
       } else {
-        // In production, make actual API call
+        // Use our secure server-side proxy instead of direct API call
         try {
-          const response = await fetch(vm.value.apiEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestPayload),
+          // Call the server-side proxy endpoint with API key ID
+          const result = await apiCaller.vm.sendVmMessage.mutate({
+            vmId: props.vmId, // Use the VM ID from props
+            message: userText, // The user's message text
+            apiKeyId: selectedApiKeyId.value, // Selected API key ID
+            // Include optional parameters
+            temperature: temperature.value,
+            maxTokens: maxTokens.value,
+            systemPrompt: systemRole.value || undefined,
           });
           
-          if (!response.ok) {
-            throw new Error(`API responded with status: ${response.status}`);
-          }
+          console.log("Server response:", result);
           
-          const data = await response.json();
-          console.log("API response:", data);
-          
-          // Parse response based on model output format
-          let responseText = '';
-          
-          // Check for Phi-specific format
-          if (data.response !== undefined) {
-            responseText = data.response;
-          }
-          // Check for standard OpenAI format
-          else if (data.choices && data.choices.length > 0) {
-            responseText = data.choices[0].message?.content || data.choices[0].text;
-          }
-          // Check for content field (Claude)
-          else if (data.content) {
-            responseText = data.content;
-          }
-          // Check for direct text field
-          else if (data.text) {
-            responseText = data.text;
-          }
-          // Check for output field (Llama.cpp, others)
-          else if (data.output) {
-            responseText = data.output;
-          }
-          // Check for generation field (Mistral)
-          else if (data.generation) {
-            responseText = data.generation;
-          }
-          // Fallback to the entire response body as string
-          else {
-            console.warn("Unknown API response format:", data);
-            responseText = JSON.stringify(data);
-          }
-          
-          // Find the placeholder message and update it
+          // Find the placeholder message and update it with the response
           const index = chatMessages.value.findIndex(msg => msg.id === assistantMessageId);
           if (index !== -1) {
             chatMessages.value[index] = {
               role: 'assistant',
-              content: responseText || 'No response content',
+              content: result.text || 'No response content',
+              model: result.model,
               timestamp: new Date().toISOString()
             };
+          }
+          
+          // If no response received, show error
+          if (!result.text) {
+            chatError.value = "Received empty response from the model";
           }
         } catch (error) {
           console.error('Error calling VM API:', error);
@@ -1287,13 +1249,14 @@
           if (index !== -1) {
             chatMessages.value[index] = {
               role: 'assistant',
-              content: 'Sorry, I encountered an error processing your request. Please try again or check if the API endpoint is correctly configured.',
+              content: 'Sorry, I encountered an error processing your request. Please check your API key and connection.',
               isError: true,
               timestamp: new Date().toISOString()
             };
           }
           
-          chatError.value = `Error: ${error instanceof Error ? error.message : String(error)}`;
+          // Display the error message
+          chatError.value = `Error: ${error.message || 'Failed to communicate with the model'}`;
         }
       }
     } catch (err) {
@@ -1301,6 +1264,10 @@
       chatError.value = `Error sending message: ${err instanceof Error ? err.message : String(err)}`;
     } finally {
       isSendingMessage.value = false;
+      // Auto-scroll to bottom after response
+      if (messagesEnd.value) {
+        messagesEnd.value.scrollIntoView({ behavior: 'smooth' });
+      }
     }
   };
   
@@ -1367,6 +1334,7 @@
   // Initial load
   onMounted(() => {
     loadVmDetails();
+    loadApiKeys(); // Load API keys when component mounts
   });
 </script>
 
@@ -2443,7 +2411,7 @@
                 <!-- Settings Panel (conditionally displayed) -->
                 <div v-if="isSettingsOpen" class="p-4 bg-gray-800 border-b border-gray-700">
                   <h4 class="text-sm font-medium text-gray-200 mb-3">Chat Settings</h4>
-                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-xs font-medium text-gray-400 mb-1">System Role</label>
                       <textarea 
@@ -2453,6 +2421,33 @@
                         placeholder="System instructions for the AI..."
                       ></textarea>
                     </div>
+                    
+                    <!-- API Key Selection -->
+                    <div>
+                      <label class="block text-xs font-medium text-gray-400 mb-1">API Key</label>
+                      <div class="relative">
+                        <select
+                          v-model="selectedApiKeyId"
+                          class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-300 appearance-none"
+                          :disabled="isLoadingApiKeys"
+                        >
+                          <option v-if="isLoadingApiKeys" value="" disabled>Loading API Keys...</option>
+                          <option v-else-if="apiKeys.length === 0" value="" disabled>No API Keys Available</option>
+                          <option v-for="key in apiKeys" :key="key.id" :value="key.id">
+                            {{ key.name }} ({{ key.type === 'PERSONAL' ? 'Personal' : 'Team' }})
+                          </option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
+                          <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                          </svg>
+                        </div>
+                      </div>
+                      <p v-if="!selectedApiKeyId && apiKeys.length > 0" class="mt-1 text-xs text-red-400">
+                        Please select an API key to send messages
+                      </p>
+                    </div>
+                    
                     <div>
                       <label class="block text-xs font-medium text-gray-400 mb-1">Temperature</label>
                       <div class="flex items-center gap-2">
@@ -2533,14 +2528,14 @@
                       @keydown.enter.prevent="sendMessage"
                       placeholder="Type your message..."
                       class="flex-1 bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-gray-200 resize-none min-h-[44px] max-h-32"
-                      :disabled="isSendingMessage || vm.status !== 'RUNNING'"
+                      :disabled="isSendingMessage || vm.status !== 'RUNNING' || !selectedApiKeyId"
                       rows="1"
                     ></textarea>
                     <button
                       type="submit"
+                      :disabled="isSendingMessage || !userInput.trim() || !selectedApiKeyId || vm.status !== 'RUNNING'"
                       class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-md p-2 h-[44px] w-[44px] flex items-center justify-center flex-shrink-0 transition-colors"
-                      :disabled="!userInput.trim() || isSendingMessage || vm.status !== 'RUNNING'"
-                      :class="{ 'opacity-50 cursor-not-allowed': !userInput.trim() || isSendingMessage || vm.status !== 'RUNNING' }"
+                      :class="{ 'opacity-50 cursor-not-allowed': !userInput.trim() || isSendingMessage || !selectedApiKeyId || vm.status !== 'RUNNING' }"
                     >
                       <LoaderIcon v-if="isSendingMessage" class="h-5 w-5 animate-spin" />
                       <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">

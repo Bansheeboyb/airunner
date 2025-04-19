@@ -9,7 +9,7 @@ import fetch from "node-fetch";
 function decryptApiKey(encryptedApiKey: string): string {
   const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
   const ENCRYPTION_IV = process.env.ENCRYPTION_IV;
-  
+
   if (!ENCRYPTION_KEY || !ENCRYPTION_IV) {
     throw new Error("Missing encryption environment variables");
   }
@@ -42,7 +42,9 @@ export const sendVmMessage = protectedProcedure
     try {
       // Get user from context for permission checks
       const { user } = ctx;
-      console.log(`Processing message request for VM ${input.vmId} from user ${user.id}`);
+      console.log(
+        `Processing message request for VM ${input.vmId} from user ${user.id}`,
+      );
 
       // Extract VM name and zone from the vmId
       const [vmName, zone] = input.vmId.split("___");
@@ -60,7 +62,7 @@ export const sendVmMessage = protectedProcedure
           team: true, // Include team info for permission checks
         },
       });
-      
+
       // Check if API key exists
       if (!apiKeyRecord) {
         throw new TRPCError({
@@ -68,7 +70,7 @@ export const sendVmMessage = protectedProcedure
           message: "API key not found",
         });
       }
-      
+
       // Permission checks
       if (apiKeyRecord.type === "PERSONAL") {
         if (apiKeyRecord.userId !== user.id) {
@@ -80,26 +82,28 @@ export const sendVmMessage = protectedProcedure
       } else if (apiKeyRecord.type === "TEAM") {
         if (!ctx.abilities.canAccessTeam(apiKeyRecord.teamId)) {
           throw new TRPCError({
-            code: "UNAUTHORIZED", 
+            code: "UNAUTHORIZED",
             message: "Not authorized to use this team's API key",
           });
         }
       }
-      
+
       // Decrypt the API key server-side
       const apiKey = decryptApiKey(apiKeyRecord.encryptedKey);
-      
+
       // Update last used timestamp for the API key
       await db.apiKey.update({
         where: { id: input.apiKeyId },
         data: { lastUsedAt: new Date() },
       });
-      
+
       // Get VM details to find the correct API endpoint
       // First, check if we have valid credentials
-      if (!process.env.GCP_PRIVATE_KEY || 
-          !process.env.GCP_SERVICE_ACCOUNT_EMAIL || 
-          !process.env.GCP_PROJECT_ID) {
+      if (
+        !process.env.GCP_PRIVATE_KEY ||
+        !process.env.GCP_SERVICE_ACCOUNT_EMAIL ||
+        !process.env.GCP_PROJECT_ID
+      ) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: "Missing GCP credentials",
@@ -112,7 +116,7 @@ export const sendVmMessage = protectedProcedure
 
       // Format private key (fix newline issues)
       const privateKey = process.env.GCP_PRIVATE_KEY.replace(/\\n/g, "\n");
-      
+
       // Create JWT client with service account credentials
       const client = new JWT({
         email: process.env.GCP_SERVICE_ACCOUNT_EMAIL,
@@ -138,7 +142,7 @@ export const sendVmMessage = protectedProcedure
       });
 
       const vm = vmResponse.data;
-      
+
       // Check if VM is running
       if (vm.status !== "RUNNING") {
         throw new TRPCError({
@@ -149,10 +153,10 @@ export const sendVmMessage = protectedProcedure
 
       // Determine API endpoint
       let apiEndpoint = null;
-      
+
       // Use instance_id label if available, otherwise fall back to IP
-      if (vm.labels && 'instance_id' in vm.labels) {
-        apiEndpoint = `http://${vm.labels.instance_id}:8000/api/generate`;
+      if (vm.labels && "instance_id" in vm.labels) {
+        apiEndpoint = `https://${vm.labels.instance_id}.api.airunner.io/api/generate`;
       } else if (
         vm.networkInterfaces &&
         vm.networkInterfaces.length > 0 &&
@@ -186,10 +190,10 @@ export const sendVmMessage = protectedProcedure
       // Send request to the VM with the API key for authentication
       console.log("Sending request to VM API endpoint");
       const response = await fetch(apiEndpoint, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(payload),
         timeout: 60000, // 60 second timeout for longer responses
@@ -208,20 +212,24 @@ export const sendVmMessage = protectedProcedure
       // Parse and return the VM's response
       const result = await response.json();
       console.log("Received response from VM API");
-      
+
       return {
-        text: result.text || result.generated_text || result.output || result.response,
+        text:
+          result.text ||
+          result.generated_text ||
+          result.output ||
+          result.response,
         usage: result.usage || null,
         model: result.model || vm.labels?.model_name || "unknown",
       };
     } catch (error) {
       console.error("Error in sendVmMessage:", error);
-      
+
       // Handle different error types
       if (error instanceof TRPCError) {
         throw error;
       }
-      
+
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: `Error processing message: ${error.message}`,

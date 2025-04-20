@@ -1159,6 +1159,7 @@
 
   // Simplified sendMessage method for Vue component
 
+  // Simple sendMessage method for Vue component
   const sendMessage = async () => {
     if (!userInput.value.trim() || isSendingMessage.value) return;
     if (vm.value?.status !== "RUNNING") {
@@ -1214,14 +1215,14 @@
           systemPrompt: systemRole.value || undefined,
         });
 
-        console.log("Raw API response:", result);
+        console.log("API response:", result);
 
         // Find the placeholder message and update it with the response
         const index = chatMessages.value.findIndex(
           (msg) => msg.id === assistantMessageId,
         );
         if (index !== -1) {
-          // For Phi-4 model which returns generated_text
+          // Use the generated_text field from the Phi-4 API
           if (result && result.generated_text) {
             chatMessages.value[index] = {
               role: "assistant",
@@ -1230,30 +1231,19 @@
               usage: result.usage || null,
               timestamp: new Date().toISOString(),
             };
-          }
-          // Fallback for text field
-          else if (result && result.text) {
+          } else {
+            // Fallback in case we don't get the right response
             chatMessages.value[index] = {
               role: "assistant",
-              content: result.text,
-              timestamp: new Date().toISOString(),
-            };
-          }
-          // For complete failure - show the raw response
-          else {
-            console.error("Unexpected response format:", result);
-            chatMessages.value[index] = {
-              role: "assistant",
-              content: `Unable to process response: ${JSON.stringify(result)}`,
+              content: "Sorry, I couldn't generate a response at this time.",
               isError: true,
               timestamp: new Date().toISOString(),
             };
-            chatError.value =
-              "Received an unexpected response format from the server";
+            chatError.value = "Received an unexpected response format";
           }
         }
       } catch (error) {
-        console.error("API call error:", error);
+        console.error("API error:", error);
 
         // Update the placeholder message with the error
         const index = chatMessages.value.findIndex(
@@ -1262,21 +1252,15 @@
         if (index !== -1) {
           chatMessages.value[index] = {
             role: "assistant",
-            content: `Error: ${error.message || "Unknown error"}`,
+            content:
+              "Sorry, there was an error connecting to the AI service. Please try again.",
             isError: true,
             timestamp: new Date().toISOString(),
           };
         }
 
-        chatError.value = `Error: ${
-          error.message || "Failed to communicate with the model"
-        }`;
+        chatError.value = error.message || "An error occurred";
       }
-    } catch (err) {
-      console.error("Error in chat process:", err);
-      chatError.value = `Error sending message: ${
-        err instanceof Error ? err.message : String(err)
-      }`;
     } finally {
       isSendingMessage.value = false;
       // Auto-scroll to bottom after response

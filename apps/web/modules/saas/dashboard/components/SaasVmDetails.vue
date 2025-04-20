@@ -1157,6 +1157,8 @@
   // This function is part of the Vue component script section
   // It handles sending messages to the Phi-4 API and updating the chat interface
 
+  // Simplified sendMessage method for Vue component
+
   const sendMessage = async () => {
     if (!userInput.value.trim() || isSendingMessage.value) return;
     if (vm.value?.status !== "RUNNING") {
@@ -1201,9 +1203,8 @@
         messagesEnd.value.scrollIntoView({ behavior: "smooth" });
       }
 
-      // Use our secure server-side proxy instead of direct API call
       try {
-        // Call the server-side proxy endpoint with API key ID
+        // Call the server-side proxy endpoint
         const result = await apiCaller.vm.sendVmMessage.mutate({
           vmId: props.vmId,
           message: userText,
@@ -1213,90 +1214,63 @@
           systemPrompt: systemRole.value || undefined,
         });
 
-        console.log("Raw server response:", JSON.stringify(result, null, 2));
+        console.log("Raw API response:", result);
 
         // Find the placeholder message and update it with the response
         const index = chatMessages.value.findIndex(
           (msg) => msg.id === assistantMessageId,
         );
         if (index !== -1) {
-          // Simple response handling specifically for Phi-4 LLM format
-          if (result && typeof result === "object") {
-            // First priority: Check for Phi-4 specific fields
-            if (typeof result.generated_text === "string") {
-              console.log(
-                "Found generated_text in the response, using Phi-4 format",
-              );
-              chatMessages.value[index] = {
-                role: "assistant",
-                content: result.generated_text,
-                model: result.model_id || result.model || "unknown",
-                usage: result.usage || null,
-                timestamp: new Date().toISOString(),
-              };
-            }
-            // Second priority: Check for our added text field
-            else if (typeof result.text === "string") {
-              console.log("Found text field in the response");
-              chatMessages.value[index] = {
-                role: "assistant",
-                content: result.text,
-                model: result.model || result.model_id || "unknown",
-                usage: result.usage || null,
-                timestamp: new Date().toISOString(),
-              };
-            }
-            // If neither field exists, show error
-            else {
-              console.error(
-                "No valid content field found in response:",
-                result,
-              );
-              const resultStr = JSON.stringify(result, null, 2);
-              chatMessages.value[index] = {
-                role: "assistant",
-                content: `Unable to transform response from server. Raw response: ${resultStr}`,
-                isError: true,
-                timestamp: new Date().toISOString(),
-              };
-              chatError.value =
-                "Received response in an unexpected format: missing 'generated_text' or 'text' field";
-            }
-          } else if (typeof result === "string") {
-            // Handle string responses
+          // For Phi-4 model which returns generated_text
+          if (result && result.generated_text) {
             chatMessages.value[index] = {
               role: "assistant",
-              content: result,
+              content: result.generated_text,
+              model: result.model_id || "unknown",
+              usage: result.usage || null,
               timestamp: new Date().toISOString(),
             };
-          } else {
-            // Handle empty or null responses
+          }
+          // Fallback for text field
+          else if (result && result.text) {
             chatMessages.value[index] = {
               role: "assistant",
-              content: "Received empty response from the model",
+              content: result.text,
+              timestamp: new Date().toISOString(),
+            };
+          }
+          // For complete failure - show the raw response
+          else {
+            console.error("Unexpected response format:", result);
+            chatMessages.value[index] = {
+              role: "assistant",
+              content: `Unable to process response: ${JSON.stringify(result)}`,
               isError: true,
               timestamp: new Date().toISOString(),
             };
-            chatError.value = "Empty response received";
+            chatError.value =
+              "Received an unexpected response format from the server";
           }
         }
-      } catch (apiError) {
-        console.error("API error:", apiError);
+      } catch (error) {
+        console.error("API call error:", error);
 
-        // Find the placeholder message and update it with error
+        // Update the placeholder message with the error
         const index = chatMessages.value.findIndex(
           (msg) => msg.id === assistantMessageId,
         );
         if (index !== -1) {
           chatMessages.value[index] = {
             role: "assistant",
-            content: `Error: ${apiError.message || "Unknown error"}`,
+            content: `Error: ${error.message || "Unknown error"}`,
             isError: true,
             timestamp: new Date().toISOString(),
           };
         }
 
-        throw apiError; // Re-throw to be caught by the outer catch block
+        chatError.value = `Error: ${
+          error.message || "Failed to communicate with the model"
+        }`;
       }
     } catch (err) {
       console.error("Error in chat process:", err);

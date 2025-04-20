@@ -40,11 +40,14 @@ export const sendVmMessage = protectedProcedure
   )
   .mutation(async ({ input, ctx }) => {
     try {
+      console.log("⭐ Starting sendVmMessage procedure");
       // Get user from context for permission checks
       const { user } = ctx;
 
       // Extract VM name and zone from the vmId
       const [vmName, zone] = input.vmId.split("___");
+      console.log(`⭐ Extracted VM name: ${vmName}, zone: ${zone}`);
+
       if (!vmName || !zone) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -53,6 +56,7 @@ export const sendVmMessage = protectedProcedure
       }
 
       // 1. Fetch and decrypt the API key
+      console.log(`⭐ Fetching API key with ID: ${input.apiKeyId}`);
       const apiKeyRecord = await db.apiKey.findUnique({
         where: { id: input.apiKeyId },
         include: { team: true },
@@ -64,6 +68,8 @@ export const sendVmMessage = protectedProcedure
           message: "API key not found",
         });
       }
+
+      console.log(`⭐ Found API key of type: ${apiKeyRecord.type}`);
 
       // Simple permission check
       if (apiKeyRecord.type === "PERSONAL" && apiKeyRecord.userId !== user.id) {
@@ -82,17 +88,37 @@ export const sendVmMessage = protectedProcedure
       }
 
       // Decrypt the API key
-      const apiKey = decryptApiKey(apiKeyRecord.encryptedKey);
+      console.log(`⭐ Decrypting API key`);
+      let apiKey;
+      try {
+        apiKey = decryptApiKey(apiKeyRecord.encryptedKey);
+        console.log(`⭐ API key decrypted successfully`);
+      } catch (decryptError) {
+        console.error(`Error decrypting API key:`, decryptError);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to decrypt API key: ${decryptError.message}`,
+        });
+      }
 
       // Update last used timestamp
-      await db.apiKey.update({
-        where: { id: input.apiKeyId },
-        data: { lastUsedAt: new Date() },
-      });
+      try {
+        await db.apiKey.update({
+          where: { id: input.apiKeyId },
+          data: { lastUsedAt: new Date() },
+        });
+        console.log(`⭐ Updated lastUsedAt timestamp for API key`);
+      } catch (dbError) {
+        // Non-fatal error, just log it
+        console.error(`Failed to update lastUsedAt timestamp:`, dbError);
+      }
 
-      // 2. Get the API endpoint from VM info
-      // For simplicity, just use the instance_id format or get from vm.labels.api_endpoint
+      // 2. Construct the API endpoint
+      // IMPORTANT: Fix this part based on your actual endpoint pattern
+      // This should match the URL format from your curl example
+      // For example: https://18ae5aa5.api.airunner.io/api/generate
       const apiEndpoint = `https://${vmName}.api.airunner.io/api/generate`;
+      console.log(`⭐ Using API endpoint: ${apiEndpoint}`);
 
       // 3. Prepare the request payload
       const payload = {
@@ -102,23 +128,41 @@ export const sendVmMessage = protectedProcedure
         system_prompt:
           input.systemPrompt || "You are Phi-4, a helpful AI assistant.",
       };
+      console.log(`⭐ Request payload:`, JSON.stringify(payload));
 
       // 4. Make the request to the LLM API
-      console.log(`Sending request to: ${apiEndpoint}`);
-      const response = await fetch(apiEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-API-Key": apiKey,
-        },
-        body: JSON.stringify(payload),
-        timeout: 60000, // 60 second timeout
-      });
+      console.log(`⭐ Sending request to LLM API`);
+      let response;
+      try {
+        response = await fetch(apiEndpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-Key": apiKey,
+            "User-Agent": "AIRunner/1.0",
+          },
+          body: JSON.stringify(payload),
+          timeout: 60000, // 60 second timeout
+        });
+        console.log(`⭐ Received response with status: ${response.status}`);
+      } catch (fetchError) {
+        console.error(`⭐ Fetch error details:`, fetchError);
+        // More detailed error message
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Network error connecting to LLM API (${apiEndpoint}): ${fetchError.message}`,
+        });
+      }
 
       // 5. Handle response errors
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`API Error: ${response.status} - ${errorText}`);
+        let errorText = "";
+        try {
+          errorText = await response.text();
+          console.error(`⭐ API Error response body:`, errorText);
+        } catch (e) {
+          console.error(`⭐ Could not read error response body`);
+        }
 
         throw new TRPCError({
           code:
@@ -129,23 +173,39 @@ export const sendVmMessage = protectedProcedure
               : response.status === 429
               ? "TOO_MANY_REQUESTS"
               : "INTERNAL_SERVER_ERROR",
-          message: `Error from LLM API: ${response.status} ${response.statusText}`,
+          message: `Error from LLM API: ${response.status} ${response.statusText}. Details: ${errorText}`,
         });
       }
 
-      // 6. Parse the response and return it directly without transformation
-      const responseText = await response.text();
+      // 6. Parse the response
+      console.log(`⭐ Parsing successful response`);
+      let responseText;
+      try {
+        responseText = await response.text();
+        console.log(
+          `⭐ Response content: ${responseText.substring(0, 200)}...`,
+        );
+      } catch (readError) {
+        console.error(`⭐ Error reading response:`, readError);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Error reading response: ${readError.message}`,
+        });
+      }
 
       try {
         // If it's valid JSON, parse and return directly
         const result = JSON.parse(responseText);
+        console.log(`⭐ Successfully parsed JSON response`);
         return result; // Return the exact response from the LLM
-      } catch (e) {
+      } catch (parseError) {
         // If not valid JSON, return the plain text
+        console.error(`⭐ Failed to parse response as JSON:`, parseError);
         return { text: responseText };
       }
     } catch (error) {
-      console.error("Error in sendVmMessage:", error);
+      // Final error handler
+      console.error("❌ Error in sendVmMessage:", error);
 
       if (error instanceof TRPCError) {
         throw error;

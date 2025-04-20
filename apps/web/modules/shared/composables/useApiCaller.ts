@@ -7,6 +7,7 @@ export const useApiCaller = () => {
     links: [
       httpBatchLink({
         url: "/api/trpc",
+        timeout: 90000, // 90-second timeout for LLM operations
       }),
     ],
     transformer: superjson,

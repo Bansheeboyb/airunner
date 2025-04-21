@@ -11,7 +11,7 @@
     TagIcon,
     CalendarIcon,
     BuildingIcon,
-    CPUIcon,
+    CpuIcon,
     ChevronLeftIcon,
   } from "lucide-vue-next";
   import { ref, computed, onMounted } from "vue";
@@ -531,7 +531,7 @@
           <!-- System Requirements -->
           <div class="bg-card rounded-lg border p-6 text-foreground">
             <h2 class="text-xl font-semibold mb-4 flex items-center">
-              <CPUIcon class="h-5 w-5 mr-2" />
+              <CpuIcon class="h-5 w-5 mr-2" />
               System Requirements
             </h2>
             <div class="space-y-4">

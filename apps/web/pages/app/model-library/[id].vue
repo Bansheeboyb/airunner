@@ -446,7 +446,7 @@
     <div v-else-if="model" class="space-y-6">
       <!-- Hero section with model banner -->
       <div
-        class="relative overflow-hidden h-64 w-36 bg-gradient-to-br rounded-t-lg border border-b-0"
+        class="relative overflow-hidden h-64 bg-gradient-to-br rounded-t-lg border border-b-0"
         :class="getGradientClass(model.category)"
       >
         <img
@@ -456,7 +456,7 @@
         />
         <div class="absolute inset-0 flex flex-col justify-center p-8">
           <span
-            class="inline-flex items-center rounded-full px-3 py-0.5 text-sm font-medium shadow-sm mb-4"
+            class="inline-flex items-center rounded-full px-3 py-0.5 text-sm font-medium shadow-sm mb-4 w-48"
             :class="getTagClass(model.category)"
           >
             <component

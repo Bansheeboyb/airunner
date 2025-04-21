@@ -5,44 +5,24 @@
     ImageIcon,
     HeadphonesIcon,
     VideoIcon,
+    InfoIcon,
+    ServerIcon,
+    CodeIcon,
+    TagIcon,
+    CalendarIcon,
+    BuildingIcon,
+    CPUIcon,
+    ChevronLeftIcon,
   } from "lucide-vue-next";
-  import { z } from "zod";
-  import { computed, ref } from "vue";
+  import { ref, computed, onMounted } from "vue";
 
+  const route = useRoute();
+  const router = useRouter();
+  const { apiCaller } = useApiCaller();
   const { currentTeam } = useUser();
 
-  const { apiCaller } = useApiCaller();
-
-  const formSchema = toTypedSchema(
-    z.object({
-      topic: z.string().min(1),
-    }),
-  );
-
-  const { handleSubmit, values } = useForm({
-    validationSchema: formSchema,
-    initialValues: {
-      topic: "",
-    },
-  });
-
-  const topicValue = computed(() => {
-    return values.topic || "";
-  });
-
-  const { data, pending, refresh, status } = useAsyncData(
-    () => {
-      return apiCaller.ai.generateProductNames.query({
-        topic: topicValue.value,
-      });
-    },
-    {
-      immediate: false,
-    },
-  );
-
-  const onSubmit = handleSubmit(async () => {
-    refresh();
+  definePageMeta({
+    layout: "saas-app",
   });
 
   // Define model interface
@@ -56,59 +36,51 @@
     tags: string[];
     updated: string;
     imageUrl?: string;
+    fullDescription?: string;
+    capabilities?: string[];
+    requirements?: {
+      minCpu: number;
+      recommendedCpu: number;
+      minMemory: number;
+      recommendedMemory: number;
+      gpuRequired: boolean;
+      recommendedGpu?: string;
+    };
+    useCases?: string[];
+    versions?: {
+      version: string;
+      releaseDate: string;
+      changes: string[];
+    }[];
   }
 
-  const models = ref<Model[]>([]);
   const isLoading = ref(true);
-  const isInitialLoad = ref(true);
-  const fetchError = ref<string | null>(null);
+  const error = ref<string | null>(null);
+  const modelId = computed(() => route.params.id as string);
+  const model = ref<Model | null>(null);
 
-  // Function to load models
-  const loadModels = async (categories = [], searchQuery = "") => {
-    try {
-      // Only set isLoading to true on initial load
-      if (isInitialLoad.value) {
-        isLoading.value = true;
-      } else {
-        // For category/search changes, we'll keep showing the existing data
-        // while new data loads in the background
-      }
-
-      fetchError.value = null;
-
-      const result = await apiCaller.vm.listAvailableModels.query({
-        category: "", // We're not filtering by category at the API level anymore
-        searchQuery: searchQuery || undefined,
-      });
-
-      models.value = result;
-    } catch (err) {
-      console.error("Error loading models:", err);
-      fetchError.value = err instanceof Error ? err.message : String(err);
-    } finally {
-      isLoading.value = false;
-      isInitialLoad.value = false;
-    }
-  };
-
-  // Search and filter state
-  const searchQuery = ref("");
-
-  // Define fixed categories
-  const fixedCategories = [
-    "Text Generation",
-    "Image Generation",
-    "Video Generation",
-    "Audio Generation",
-  ];
-
-  // Selected categories for filtering (now an array for multiple selection)
-  const selectedCategories = ref([]);
+  // Deployment state
+  const showDeploymentForm = ref(false);
+  const deploymentConfig = ref({
+    modelName: "",
+    cpuCount: 4,
+    memoryGB: 16,
+    gpuType: "",
+    gpuCount: 1,
+    region: "us-central1",
+    teamId: currentTeam.value?.id,
+    apiKeyId: null as string | null,
+  });
+  const isDeploying = ref(false);
+  const deploymentError = ref<string | null>(null);
+  const deploymentStatus = ref<string | null>(null);
+  const vmName = ref<string | null>(null);
+  const apiEndpoint = ref<string | null>(null);
+  const isDeploymentReady = ref(false);
 
   // API keys state
   const apiKeys = ref<any[]>([]);
   const isLoadingApiKeys = ref(false);
-  const selectedApiKey = ref<string | null>(null);
 
   // Load API keys
   const loadApiKeys = async () => {
@@ -121,7 +93,7 @@
       apiKeys.value = result;
       // Set default selected API key if available
       if (result.length > 0) {
-        selectedApiKey.value = result[0].id;
+        deploymentConfig.value.apiKeyId = result[0].id;
       }
     } catch (error: any) {
       console.error("Error loading API keys:", error);
@@ -130,55 +102,102 @@
     }
   };
 
-  // Deployment state
-  const showDeploymentForm = ref(false);
-  const selectedModelForDeployment = ref<Model | null>(null);
-  const deploymentConfig = ref({
-    modelName: "",
-    cpuCount: 4,
-    memoryGB: 16,
-    gpuType: "",
-    gpuCount: 1,
-    region: "us-central1",
-    teamId: currentTeam.value?.id,
-    apiKeyId: null as string | null,
-  });
-  const isDeploying = ref(false);
-  const error = ref<string | null>(null);
-  const deploymentStatus = ref<string | null>(null);
-  const vmName = ref<string | null>(null);
-  const apiEndpoint = ref<string | null>(null);
-  const isDeploymentReady = ref(false);
-  interface Vm {
-    id: string;
-    name: string;
-    labels?: { model_name?: string };
-    status: string;
-    zone: string;
-    creationTimestamp: string;
-    apiEndpoint?: string;
-  }
+  // Load the model details
+  const loadModel = async () => {
+    try {
+      isLoading.value = true;
+      error.value = null;
 
-  const userVms = ref<Vm[]>([]);
-
-  // Show deployment form for a specific model
-  const openDeploymentForm = async (
-    model:
-      | Model
-      | {
-          id: number;
-          name: string;
-          model: string;
-          company: string;
-          category: string;
-          description: string;
-          tags: string[];
-          updated: string;
+      // Fetch the model from the API
+      const result = await apiCaller.vm.listAvailableModels.query({});
+      
+      // Find the model with the matching ID
+      const foundModel = result.find(m => m.id.toString() === modelId.value);
+      
+      if (!foundModel) {
+        error.value = "Model not found";
+        return;
+      }
+      
+      // In a real API, we would fetch detailed model info from a dedicated endpoint
+      // For now, we'll enhance the basic model data with some mock detailed info
+      model.value = {
+        ...foundModel,
+        fullDescription: foundModel.description + " This model represents cutting-edge AI technology designed to deliver exceptional performance across a wide range of use cases. It has been optimized for deployment in production environments and offers a balance of speed and accuracy.",
+        capabilities: [
+          "Advanced contextual understanding",
+          "State-of-the-art text generation",
+          "Robust knowledge base across multiple domains",
+          "Excellent code generation capabilities",
+          "Complex reasoning and problem-solving"
+        ],
+        requirements: {
+          minCpu: 2,
+          recommendedCpu: 4,
+          minMemory: 8,
+          recommendedMemory: 16,
+          gpuRequired: foundModel.category === "Image Generation" || foundModel.category === "Video Generation",
+          recommendedGpu: foundModel.category === "Image Generation" || foundModel.category === "Video Generation" ? "nvidia-tesla-t4" : undefined
+        },
+        useCases: [
+          "Enterprise chatbots",
+          "Content creation assistance",
+          "Research and analysis",
+          "Data processing and summarization",
+          "Creative writing and ideation"
+        ],
+        versions: [
+          {
+            version: "1.0",
+            releaseDate: "2023-05-15",
+            changes: ["Initial release"]
+          },
+          {
+            version: "1.1",
+            releaseDate: "2023-08-01",
+            changes: ["Improved context handling", "Better response coherence", "Enhanced reasoning capabilities"]
+          },
+          {
+            version: "1.2",
+            releaseDate: "2024-01-10",
+            changes: ["Optimization for faster inference", "Reduced memory footprint", "Context window expansion"]
+          }
+        ]
+      };
+      
+      // Set deployment defaults based on model requirements
+      if (model.value?.requirements) {
+        deploymentConfig.value.cpuCount = model.value.requirements.recommendedCpu;
+        deploymentConfig.value.memoryGB = model.value.requirements.recommendedMemory;
+        if (model.value.requirements.gpuRequired && model.value.requirements.recommendedGpu) {
+          deploymentConfig.value.gpuType = model.value.requirements.recommendedGpu;
+          deploymentConfig.value.gpuCount = 1;
+        } else {
+          deploymentConfig.value.gpuType = "";
         }
-      | null,
-  ) => {
-    selectedModelForDeployment.value = model;
-    deploymentConfig.value.modelName = model?.model || "";
+      }
+      
+      // Set model name for deployment
+      deploymentConfig.value.modelName = model.value.model;
+      
+    } catch (err) {
+      console.error("Error loading model:", err);
+      error.value = err instanceof Error ? err.message : String(err);
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  // Function to format dates
+  const formatDate = (timestamp: string | number | Date) => {
+    if (!timestamp) return "Unknown";
+    return new Date(timestamp).toLocaleString();
+  };
+
+  // Open deployment form
+  const openDeploymentForm = async () => {
+    if (!model.value) return;
+    
     showDeploymentForm.value = true;
     
     // Load API keys when opening the form if not already loaded
@@ -195,8 +214,7 @@
   // Close deployment form
   const closeDeploymentForm = () => {
     showDeploymentForm.value = false;
-    selectedModelForDeployment.value = null;
-    error.value = null;
+    deploymentError.value = null;
     deploymentStatus.value = null;
     apiEndpoint.value = null;
     // Reset API key ID
@@ -206,11 +224,11 @@
   // Deploy the model
   const deployModel = async () => {
     try {
-      error.value = null;
+      deploymentError.value = null;
       
       // Validate API key selection
       if (!deploymentConfig.value.apiKeyId) {
-        error.value = "Please select an API key for VM authentication";
+        deploymentError.value = "Please select an API key for VM authentication";
         return;
       }
       
@@ -235,11 +253,8 @@
 
       // Start checking the status periodically
       setTimeout(checkStatus, 30000); // Check after 30 seconds
-
-      // Refresh VM list
-      setTimeout(loadUserVms, 5000);
     } catch (err) {
-      error.value = `Error: ${
+      deploymentError.value = `Error: ${
         err instanceof Error ? err.message : String(err)
       }`;
     } finally {
@@ -264,9 +279,6 @@
         deploymentStatus.value = `Deployment complete! VM is running.`;
         apiEndpoint.value = result.apiEndpoint;
         isDeploymentReady.value = true;
-
-        // Refresh VM list
-        await loadUserVms();
       } else {
         deploymentStatus.value = `VM status: ${result.vmStatus}. Not ready yet.`;
 
@@ -274,106 +286,11 @@
         setTimeout(checkStatus, 30000);
       }
     } catch (err) {
-      error.value = `Error checking status: ${
+      deploymentError.value = `Error checking status: ${
         err instanceof Error ? err.message : String(err)
       }`;
     }
   };
-
-  // Function to load user's VMs
-  const loadUserVms = async () => {
-    try {
-      interface VmResponse {
-        vms: Vm[];
-      }
-
-      const { vms }: VmResponse = await apiCaller.vm.listUserVms.query();
-      userVms.value = vms || [];
-    } catch (err) {
-      console.error("Error loading VMs:", err);
-      error.value = `Error loading VMs: ${
-        err instanceof Error ? err.message : String(err)
-      }`;
-    }
-  };
-
-  // Helper function to format dates
-  const formatDate = (timestamp: string | number | Date) => {
-    if (!timestamp) return "Unknown";
-    return new Date(timestamp).toLocaleString();
-  };
-
-  // Toggle category selection
-  const toggleCategorySelection = (category) => {
-    const index = selectedCategories.value.indexOf(category);
-    if (index === -1) {
-      selectedCategories.value.push(category);
-    } else {
-      selectedCategories.value.splice(index, 1);
-    }
-  };
-
-  const filteredModels = computed(() => {
-    return models.value.filter((model) => {
-      const matchesSearch =
-        searchQuery.value === "" ||
-        model.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        model.description
-          .toLowerCase()
-          .includes(searchQuery.value.toLowerCase()) ||
-        model.company.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-        model.tags.some((tag) =>
-          tag.toLowerCase().includes(searchQuery.value.toLowerCase()),
-        );
-
-      // If no categories are selected or "All Models" is selected, show all models
-      const matchesCategory =
-        selectedCategories.value.length === 0 ||
-        selectedCategories.value.includes(model.category);
-
-      return matchesSearch && matchesCategory;
-    });
-  });
-
-  const filteredModelsByCategory = computed(() => {
-    type GroupedModels = Record<string, Model[]>;
-    const groupedModels: GroupedModels = {};
-
-    // Initialize with all categories that might be in filtered results
-    const categories = [
-      ...new Set(filteredModels.value.map((model) => model.category)),
-    ];
-    categories.forEach((category) => {
-      groupedModels[category] = [];
-    });
-
-    // Populate with filtered models
-    filteredModels.value.forEach((model) => {
-      if (!groupedModels[model.category]) {
-        groupedModels[model.category] = [];
-      }
-      groupedModels[model.category].push(model);
-    });
-
-    return groupedModels;
-  });
-
-  watch(
-    [searchQuery, selectedCategories],
-    ([newSearchQuery, newSelectedCategories]) => {
-      loadModels(newSelectedCategories, newSearchQuery);
-    },
-  );
-
-  // Load user's VMs and API keys on component mount
-  onMounted(async () => {
-    loadModels();
-    await loadUserVms();
-    await loadApiKeys();
-  });
-
-  // Define CSS variables to use primary color from your theme
-  const primaryColor = "text-primary"; // Assuming your theme uses text-primary class
 
   // Utility functions
   const getGradientClass = (category: string): string => {
@@ -405,349 +322,277 @@
         return "bg-purple-100 text-purple-800";
     }
   };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case "Text Generation":
+        return MessageSquareIcon;
+      case "Image Generation":
+        return ImageIcon;
+      case "Audio Generation":
+        return HeadphonesIcon;
+      case "Video Generation":
+        return VideoIcon;
+      default:
+        return Wand2Icon;
+    }
+  };
+
+  // Load model on component mount
+  onMounted(() => {
+    loadModel();
+  });
 </script>
 
 <template>
-  <div class="container max-w-6xl mx-auto px-4 py-2">
-    <!-- Search and Filter Section -->
-    <div class="mb-8">
-      <div
-        class="flex flex-col md:flex-row gap-4 items-center justify-between pb-4"
+  <div class="container max-w-6xl py-8">
+    <!-- Back button and header -->
+    <div class="flex items-center mb-6">
+      <button 
+        @click="router.push('/app/model-library')" 
+        class="flex items-center text-gray-400 hover:text-gray-200 transition-colors mr-4"
       >
-        <div class="relative w-full md:w-64 ml-auto">
-          <input
-            v-model="searchQuery"
-            type="text"
-            placeholder="Search models..."
-            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-          <div
-            class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-5 w-5 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <!--  Category Navigation with Checkboxes -->
-      <ul
-        v-if="isInitialLoad && isLoading"
-        class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm"
-      >
-        <li>
-          <div class="h-8 bg-gray-300 rounded w-24 animate-pulse"></div>
-        </li>
-        <li v-for="i in 4" :key="i">
-          <div class="h-8 bg-gray-300 rounded w-28 animate-pulse"></div>
-        </li>
-      </ul>
-
-      <!-- Fixed Category Navigation with checkboxes -->
-      <ul
-        v-else
-        class="no-scrollbar -mx-8 -mb-4 mt-6 flex list-none items-center justify-start gap-6 overflow-x-auto px-8 text-sm"
-      >
-        <li>
-          <div class="flex items-center gap-2 px-1 pb-3 text-sm">
-            <label class="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                :checked="selectedCategories.length === 0"
-                @click="selectedCategories = []"
-                class="form-checkbox h-4 w-4 text-indigo-600"
-              />
-              <span
-                class="ml-2 transition-colors"
-                :class="
-                  selectedCategories.length === 0
-                    ? 'font-bold text-primary'
-                    : ''
-                "
-              >
-                All Models
-              </span>
-            </label>
-          </div>
-        </li>
-        <li v-for="category in fixedCategories" :key="category">
-          <div class="flex items-center gap-2 px-1 pb-3 text-sm">
-            <label class="flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                :checked="selectedCategories.includes(category)"
-                @click="toggleCategorySelection(category)"
-                class="form-checkbox h-4 w-4 text-indigo-600"
-              />
-              <span
-                class="ml-2 transition-colors"
-                :class="
-                  selectedCategories.includes(category)
-                    ? 'font-bold text-primary'
-                    : ''
-                "
-              >
-                {{ category }}
-              </span>
-            </label>
-          </div>
-        </li>
-      </ul>
-    </div>
-
-    <!-- Skeleton Loader (only show during initial load) -->
-    <div v-if="isInitialLoad && isLoading" class="mb-12 mt-12">
-      <div class="h-8 w-48 bg-gray-300 rounded mb-6 animate-pulse"></div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div
-          v-for="i in 6"
-          :key="i"
-          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[#3c3c3c] animate-pulse"
-        >
-          <!-- Skeleton Header -->
-          <div class="relative h-40 bg-gray-700"></div>
-
-          <!-- Skeleton Content -->
-          <div class="p-5 flex-grow flex flex-col">
-            <!-- Skeleton Model Info -->
-            <div class="mb-4">
-              <div class="flex items-center mb-2">
-                <div
-                  class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gray-700"
-                ></div>
-                <div class="h-5 bg-gray-700 rounded w-32"></div>
-              </div>
-              <div class="h-4 bg-gray-700 rounded w-24 mb-2"></div>
-            </div>
-
-            <!-- Skeleton Description -->
-            <div class="h-4 bg-gray-700 rounded w-full mb-2"></div>
-            <div class="h-4 bg-gray-700 rounded w-5/6 mb-4"></div>
-
-            <!-- Skeleton Tags -->
-            <div class="flex flex-wrap gap-2 mb-4">
-              <div class="h-6 bg-gray-700 rounded w-16"></div>
-              <div class="h-6 bg-gray-700 rounded w-20"></div>
-              <div class="h-6 bg-gray-700 rounded w-24"></div>
-            </div>
-
-            <!-- Spacer -->
-            <div class="flex-grow"></div>
-
-            <!-- Skeleton Footer -->
-            <div
-              class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
-            >
-              <div class="h-4 bg-gray-700 rounded w-20"></div>
-              <div class="flex gap-2">
-                <div class="h-6 bg-gray-700 rounded w-16"></div>
-                <div class="h-6 bg-gray-700 rounded w-16"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Error State -->
-    <div
-      v-else-if="fetchError"
-      class="bg-red-50 rounded-lg p-8 text-center mb-12 mt-12"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-12 w-12 mx-auto text-red-400 mb-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-        />
-      </svg>
-      <h3 class="text-lg font-medium text-red-900 mb-2">
-        Failed to load models
-      </h3>
-      <p class="text-red-600">{{ fetchError }}</p>
-      <button
-        @click="loadModels()"
-        class="mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
-      >
-        Try Again
+        <ChevronLeftIcon class="h-5 w-5 mr-1" />
+        <span>Back to Library</span>
       </button>
+      <SaasPageHeader class="mb-0">
+        <template #title>Model Details</template>
+        <template #subtitle>Explore and deploy AI models for your team</template>
+      </SaasPageHeader>
     </div>
 
-    <!-- Models Grid -->
-    <div
-      v-else
-      v-for="(modelGroup, category) in filteredModelsByCategory"
-      :key="category"
-      class="mb-12 mt-12"
-    >
-      <h2 class="text-2xl font-semibold mb-6">{{ category }}</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div
-          v-for="model in modelGroup"
-          :key="model.id"
-          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50"
+    <!-- Loading state -->
+    <div v-if="isLoading" class="bg-card rounded-lg border p-8 text-foreground">
+      <div class="flex flex-col gap-4 items-center justify-center py-12">
+        <svg 
+          class="animate-spin h-12 w-12 text-primary" 
+          xmlns="http://www.w3.org/2000/svg" 
+          fill="none" 
+          viewBox="0 0 24 24"
         >
-          <!-- Card Header with Image -->
-          <div class="relative h-40 overflow-hidden">
-            <img
-              :src="model.imageUrl"
-              :alt="model.name"
-              class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            />
-            <!-- Category Tag - Moved to top right for better visibility -->
-            <span
-              class="absolute top-2 right-2 text-xs font-medium px-3 py-1 rounded-full shadow-sm"
-              :class="getTagClass(model.category)"
-            >
-              {{ model.category }}
-            </span>
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <p class="text-xl font-medium">Loading model information...</p>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div 
+      v-else-if="error" 
+      class="bg-destructive/10 rounded-lg border border-destructive p-8 text-foreground"
+    >
+      <div class="flex flex-col gap-4 items-center justify-center py-12">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          class="h-12 w-12 text-destructive"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+        <p class="text-xl font-medium text-destructive">{{ error }}</p>
+        <button 
+          @click="loadModel" 
+          class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+
+    <!-- Model details content -->
+    <div v-else-if="model" class="space-y-6">
+      <!-- Hero section with model banner -->
+      <div class="relative overflow-hidden h-64 bg-gradient-to-br rounded-t-lg border border-b-0" :class="getGradientClass(model.category)">
+        <img v-if="model.imageUrl" :src="model.imageUrl" class="w-full h-full object-cover opacity-30" />
+        <div class="absolute inset-0 flex flex-col justify-center p-8">
+          <span 
+            class="inline-flex items-center rounded-full px-3 py-0.5 text-sm font-medium shadow-sm mb-4"
+            :class="getTagClass(model.category)"
+          >
+            <component :is="getCategoryIcon(model.category)" class="h-4 w-4 mr-1" />
+            {{ model.category }}
+          </span>
+          <h1 class="text-4xl font-bold text-white mb-2">{{ model.name }}</h1>
+          <div class="flex items-center text-white/80">
+            <BuildingIcon class="h-4 w-4 mr-1" />
+            <span class="mr-4">{{ model.company }}</span>
+            <CalendarIcon class="h-4 w-4 mr-1" />
+            <span>Updated: {{ formatDate(model.updated) }}</span>
           </div>
+        </div>
+      </div>
 
-          <!-- Card Content with better spacing and organization -->
-          <div class="p-5 flex-grow flex flex-col">
-            <!-- Model Info Section -->
-            <div class="mb-4">
-              <!-- Company and Model Identifier -->
-              <div class="flex items-center mb-2">
-                <div
-                  class="flex-shrink-0 w-8 h-8 rounded-full mr-3 bg-gradient-to-br flex items-center justify-center"
-                  :class="getGradientClass(model.category)"
-                >
-                  <MessageSquareIcon
-                    v-if="model.category === 'Text Generation'"
-                    class="size-4 text-white"
-                  />
-                  <ImageIcon
-                    v-else-if="model.category === 'Image Generation'"
-                    class="size-4 text-white"
-                  />
-                  <HeadphonesIcon
-                    v-else-if="model.category === 'Audio Generation'"
-                    class="size-4 text-white"
-                  />
-                  <VideoIcon
-                    v-else-if="model.category === 'Video Generation'"
-                    class="size-4 text-white"
-                  />
-                  <Wand2Icon v-else class="size-4 text-white" />
-                </div>
-                <span class="font-medium text-gray-300">{{ model.name }}</span>
-              </div>
-
-              <!-- Company name with better typography -->
-              <p class="text-gray-400 text-sm mb-2 font-medium">
-                {{ model.company }}
-              </p>
-            </div>
-
-            <!-- Model description - Limited to 2 lines -->
-            <p class="text-gray-600 text-sm mb-4 line-clamp-2">
-              {{ model.description }}
+      <!-- Main content area -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Left column - Main info -->
+        <div class="lg:col-span-2 space-y-6">
+          <!-- Overview card -->
+          <div class="bg-card rounded-lg border p-6 text-foreground">
+            <h2 class="text-2xl font-semibold mb-4 flex items-center">
+              <InfoIcon class="h-5 w-5 mr-2" />
+              Overview
+            </h2>
+            <p class="text-foreground/80 whitespace-pre-line mb-6">
+              {{ model.fullDescription }}
             </p>
-
-            <!-- Tags section -->
+            
+            <!-- Tags -->
             <div class="flex flex-wrap gap-2 mb-4">
+              <div class="flex items-center text-sm font-medium mr-2">
+                <TagIcon class="h-4 w-4 mr-1" />
+                Tags:
+              </div>
               <span
                 v-for="(tag, index) in model.tags"
                 :key="index"
-                class="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded"
+                class="text-xs bg-muted px-2 py-1 rounded"
               >
                 {{ tag }}
               </span>
             </div>
-
-            <!-- Spacer to push footer to bottom -->
-            <div class="flex-grow"></div>
-
-            <!-- Card Footer with clearer separation -->
-            <div
-              class="flex items-center justify-between text-xs pt-3 border-t border-gray-700"
-            >
-              <!-- Updated Date -->
-              <div class="flex items-center text-gray-400">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-4 w-4 mr-1"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-                <span>{{ model.updated }}</span>
+          </div>
+          
+          <!-- Capabilities card -->
+          <div class="bg-card rounded-lg border p-6 text-foreground">
+            <h2 class="text-2xl font-semibold mb-4 flex items-center">
+              <Wand2Icon class="h-5 w-5 mr-2" />
+              Capabilities
+            </h2>
+            <ul class="list-disc pl-6 space-y-2">
+              <li v-for="(capability, index) in model.capabilities" :key="index" class="text-foreground/80">
+                {{ capability }}
+              </li>
+            </ul>
+          </div>
+          
+          <!-- Use Cases card -->
+          <div class="bg-card rounded-lg border p-6 text-foreground">
+            <h2 class="text-2xl font-semibold mb-4 flex items-center">
+              <CodeIcon class="h-5 w-5 mr-2" />
+              Use Cases
+            </h2>
+            <ul class="list-disc pl-6 space-y-2">
+              <li v-for="(useCase, index) in model.useCases" :key="index" class="text-foreground/80">
+                {{ useCase }}
+              </li>
+            </ul>
+          </div>
+          
+          <!-- Version History -->
+          <div class="bg-card rounded-lg border p-6 text-foreground">
+            <h2 class="text-2xl font-semibold mb-4 flex items-center">
+              <CalendarIcon class="h-5 w-5 mr-2" />
+              Version History
+            </h2>
+            <div class="space-y-4">
+              <div v-for="(version, index) in model.versions" :key="index" class="border-l-2 border-primary/30 pl-4 pb-4">
+                <div class="flex items-center mb-2">
+                  <span class="font-semibold mr-2">Version {{ version.version }}</span>
+                  <span class="text-sm text-foreground/60">{{ formatDate(version.releaseDate) }}</span>
+                </div>
+                <ul class="list-disc pl-6 space-y-1">
+                  <li v-for="(change, changeIndex) in version.changes" :key="changeIndex" class="text-sm text-foreground/80">
+                    {{ change }}
+                  </li>
+                </ul>
               </div>
-
-              <!-- Action Buttons - More prominent -->
-              <div class="flex gap-2">
-                <NuxtLink
-                  :to="`/app/model-library/${model.id}`"
-                  class="text-indigo-600 hover:text-indigo-700 font-medium text-xs"
-                >
-                  View Details
-                </NuxtLink>
-                <button
-                  @click="openDeploymentForm(model)"
-                  class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200"
-                >
-                  Deploy
-                </button>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Right column - Deployment and requirements -->
+        <div class="space-y-6">
+          <!-- Deploy button card -->
+          <div class="bg-card rounded-lg border p-6 text-foreground">
+            <h2 class="text-2xl font-semibold mb-4 flex items-center">
+              <ServerIcon class="h-5 w-5 mr-2" />
+              Deploy Model
+            </h2>
+            <p class="text-foreground/80 mb-6">
+              Deploy this model to your private instance to start using it in your applications.
+            </p>
+            <button
+              @click="openDeploymentForm"
+              class="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-3 rounded-md transition-colors flex items-center justify-center"
+            >
+              <ServerIcon class="h-5 w-5 mr-2" />
+              Deploy Now
+            </button>
+          </div>
+          
+          <!-- System Requirements -->
+          <div class="bg-card rounded-lg border p-6 text-foreground">
+            <h2 class="text-xl font-semibold mb-4 flex items-center">
+              <CPUIcon class="h-5 w-5 mr-2" />
+              System Requirements
+            </h2>
+            <div class="space-y-4">
+              <div>
+                <h3 class="font-medium mb-2">CPU</h3>
+                <div class="flex items-center justify-between">
+                  <span class="text-foreground/80">Minimum</span>
+                  <span class="font-medium">{{ model.requirements?.minCpu }} cores</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-foreground/80">Recommended</span>
+                  <span class="font-medium">{{ model.requirements?.recommendedCpu }} cores</span>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="font-medium mb-2">Memory</h3>
+                <div class="flex items-center justify-between">
+                  <span class="text-foreground/80">Minimum</span>
+                  <span class="font-medium">{{ model.requirements?.minMemory }} GB</span>
+                </div>
+                <div class="flex items-center justify-between">
+                  <span class="text-foreground/80">Recommended</span>
+                  <span class="font-medium">{{ model.requirements?.recommendedMemory }} GB</span>
+                </div>
+              </div>
+              
+              <div>
+                <h3 class="font-medium mb-2">GPU</h3>
+                <div v-if="model.requirements?.gpuRequired" class="flex items-center justify-between">
+                  <span class="text-foreground/80">Required</span>
+                  <span class="font-medium">Yes</span>
+                </div>
+                <div v-else class="flex items-center justify-between">
+                  <span class="text-foreground/80">Required</span>
+                  <span class="font-medium">No (CPU only)</span>
+                </div>
+                <div v-if="model.requirements?.recommendedGpu" class="flex items-center justify-between">
+                  <span class="text-foreground/80">Recommended</span>
+                  <span class="font-medium">{{ model.requirements?.recommendedGpu }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Model ID info -->
+          <div class="bg-card rounded-lg border p-6 text-foreground">
+            <h2 class="text-xl font-semibold mb-4">Model Information</h2>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-foreground/80">Model ID</span>
+                <span class="font-mono text-sm bg-muted px-2 py-1 rounded">{{ model.id }}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="text-foreground/80">Model Name</span>
+                <span class="font-mono text-sm bg-muted px-2 py-1 rounded">{{ model.model }}</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- Empty State (when not loading and no results) -->
-    <div
-      v-if="
-        !isInitialLoad &&
-        !isLoading &&
-        !fetchError &&
-        Object.keys(filteredModelsByCategory).length === 0
-      "
-      class="bg-gray-50 rounded-lg p-8 text-center mb-12 mt-12"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="h-12 w-12 mx-auto text-gray-400 mb-4"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-        />
-      </svg>
-      <h3 class="text-lg font-medium text-gray-900 mb-2">No models found</h3>
-      <p class="text-gray-600">Try adjusting your search or filter criteria</p>
     </div>
 
     <!-- Deployment Modal -->
@@ -761,7 +606,7 @@
         <div class="p-6">
           <div class="flex justify-between items-center mb-6">
             <h2 class="text-xl font-bold text-gray-100">
-              Deploy {{ selectedModelForDeployment?.name }}
+              Deploy {{ model?.name }}
             </h2>
             <button
               @click="closeDeploymentForm"
@@ -786,10 +631,10 @@
 
           <!-- Status and Error Messages -->
           <div
-            v-if="error"
+            v-if="deploymentError"
             class="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6"
           >
-            {{ error }}
+            {{ deploymentError }}
           </div>
 
           <div
@@ -1050,23 +895,3 @@
     </div>
   </div>
 </template>
-
-<style scoped>
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  /* Hide scrollbar for Chrome, Safari and Opera */
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Hide scrollbar for IE, Edge and Firefox */
-  .no-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
-  }
-</style>

@@ -198,7 +198,7 @@ export const sendVmMessage = protectedProcedure
             "User-Agent": "AIRunner/1.0",
           },
           body: JSON.stringify(payload),
-          timeout: 60000, // 60 second timeout
+          // No timeout - wait indefinitely for response
         });
         console.log(`Received response with status: ${response.status}`);
       } catch (fetchError) {

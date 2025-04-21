@@ -68,38 +68,71 @@ export const sendVmMessage = protectedProcedure
       // Extract the instance ID from the vmId (format: "vmName___zone")
       const [vmName] = input.vmId.split("___");
 
-      // Get the API endpoint - HARDCODED FOR NOW
-      // REPLACE THIS WITH YOUR ACTUAL ENDPOINT
+      // TESTING: Using hardcoded values for debugging
       const apiEndpoint = "https://18ae5aa5.api.airunner.io/api/generate";
+      console.log(`Using hardcoded test API endpoint: ${apiEndpoint}`);
 
-      // Prepare the request payload
+      // Use hardcoded test API key instead of the decrypted one
+      const testApiKey = "pk_live_da30a17690e5033d7ab8a041db4b6ec5b1b83ec2e1f68306";
+      console.log(`Using hardcoded test API key instead of the decrypted one`);
+
+      // Prepare the request payload with hardcoded values
       const payload = {
         prompt: input.message,
-        temperature: input.temperature ?? 0.7,
-        max_tokens: input.maxTokens ?? 2048,
-        system_prompt:
-          input.systemPrompt || "You are Phi-4, a helpful AI assistant.",
+        temperature: 0.7,
+        max_tokens: 2048,
+        system_prompt: "You are Phi-4, a helpful AI assistant.",
       };
+      console.log(`Test payload prepared:`, payload);
 
-      // Make the request to the LLM API
+      // Make the request to the LLM API with hardcoded values
+      console.log(`Sending test request to LLM API`);
       const response = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-API-Key": apiKey,
+          "X-API-Key": testApiKey,
+          "User-Agent": "AIRunner/1.0",
         },
         body: JSON.stringify(payload),
+        // @ts-ignore - node-fetch may not support timeout option directly
+        timeout: 120000, // Extended 120 second timeout for testing
       });
+      console.log(`Received response with status: ${response.status}`);
 
       if (!response.ok) {
+        // Get detailed error message from response
+        let errorText = "";
+        try {
+          errorText = await response.text();
+          console.error(`API Error response body:`, errorText);
+        } catch (e) {
+          console.error(`Could not read error response body`);
+        }
+
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: `API error: ${response.status}`,
+          message: `API error: ${response.status} ${response.statusText}. Details: ${errorText}`,
         });
       }
 
       // Parse and return the response directly
-      const result = await response.json();
+      let result;
+      try {
+        const responseText = await response.text();
+        console.log(`Raw response text (first 200 chars): ${responseText.substring(0, 200)}...`);
+        
+        // Try to parse as JSON
+        result = JSON.parse(responseText);
+        console.log(`Successfully parsed JSON response`);
+      } catch (parseError) {
+        console.error(`Error parsing response:`, parseError);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to parse API response: ${parseError.message}`,
+        });
+      }
+      
       return result;
     } catch (error) {
       if (error instanceof TRPCError) {

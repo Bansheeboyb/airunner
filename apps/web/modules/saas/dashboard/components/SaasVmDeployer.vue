@@ -601,10 +601,11 @@
     >
       <h2 class="text-2xl font-semibold mb-6">{{ category }}</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div
+        <NuxtLink
           v-for="model in modelGroup"
           :key="model.id"
-          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50"
+          :to="`/app/model-library/${model.id}`"
+          class="bg-[#1b2931] rounded-2xl shadow-sm overflow-hidden border-2 border-[ADBFD1] transition-all duration-300 hover:shadow-neon hover:scale-[1.02] group hover:shadow-crypto-blue-500 shadow-crypto-blue-500/50 block"
         >
           <!-- Card Header with Image -->
           <div class="relative h-40 overflow-hidden">
@@ -706,11 +707,12 @@
                 <NuxtLink
                   :to="`/app/model-library/${model.id}`"
                   class="text-indigo-600 hover:text-indigo-700 font-medium text-xs"
+                  @click.stop
                 >
                   View Details
                 </NuxtLink>
                 <button
-                  @click="openDeploymentForm(model)"
+                  @click.stop="openDeploymentForm(model)"
                   class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors duration-200"
                 >
                   Deploy
@@ -718,7 +720,7 @@
               </div>
             </div>
           </div>
-        </div>
+        </NuxtLink>
       </div>
     </div>
 

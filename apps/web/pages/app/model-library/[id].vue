@@ -110,76 +110,97 @@
 
       // Fetch the model from the API
       const result = await apiCaller.vm.listAvailableModels.query({});
-      
+
       // Find the model with the matching ID
-      const foundModel = result.find(m => m.id.toString() === modelId.value);
-      
+      const foundModel = result.find((m) => m.id.toString() === modelId.value);
+
       if (!foundModel) {
         error.value = "Model not found";
         return;
       }
-      
+
       // In a real API, we would fetch detailed model info from a dedicated endpoint
       // For now, we'll enhance the basic model data with some mock detailed info
       model.value = {
         ...foundModel,
-        fullDescription: foundModel.description + " This model represents cutting-edge AI technology designed to deliver exceptional performance across a wide range of use cases. It has been optimized for deployment in production environments and offers a balance of speed and accuracy.",
+        fullDescription:
+          foundModel.description +
+          " This model represents cutting-edge AI technology designed to deliver exceptional performance across a wide range of use cases. It has been optimized for deployment in production environments and offers a balance of speed and accuracy.",
         capabilities: [
           "Advanced contextual understanding",
           "State-of-the-art text generation",
           "Robust knowledge base across multiple domains",
           "Excellent code generation capabilities",
-          "Complex reasoning and problem-solving"
+          "Complex reasoning and problem-solving",
         ],
         requirements: {
           minCpu: 2,
           recommendedCpu: 4,
           minMemory: 8,
           recommendedMemory: 16,
-          gpuRequired: foundModel.category === "Image Generation" || foundModel.category === "Video Generation",
-          recommendedGpu: foundModel.category === "Image Generation" || foundModel.category === "Video Generation" ? "nvidia-tesla-t4" : undefined
+          gpuRequired:
+            foundModel.category === "Image Generation" ||
+            foundModel.category === "Video Generation",
+          recommendedGpu:
+            foundModel.category === "Image Generation" ||
+            foundModel.category === "Video Generation"
+              ? "nvidia-tesla-t4"
+              : undefined,
         },
         useCases: [
           "Enterprise chatbots",
           "Content creation assistance",
           "Research and analysis",
           "Data processing and summarization",
-          "Creative writing and ideation"
+          "Creative writing and ideation",
         ],
         versions: [
           {
             version: "1.0",
             releaseDate: "2023-05-15",
-            changes: ["Initial release"]
+            changes: ["Initial release"],
           },
           {
             version: "1.1",
             releaseDate: "2023-08-01",
-            changes: ["Improved context handling", "Better response coherence", "Enhanced reasoning capabilities"]
+            changes: [
+              "Improved context handling",
+              "Better response coherence",
+              "Enhanced reasoning capabilities",
+            ],
           },
           {
             version: "1.2",
             releaseDate: "2024-01-10",
-            changes: ["Optimization for faster inference", "Reduced memory footprint", "Context window expansion"]
-          }
-        ]
+            changes: [
+              "Optimization for faster inference",
+              "Reduced memory footprint",
+              "Context window expansion",
+            ],
+          },
+        ],
       };
-      
+
       // Set deployment defaults based on model requirements
       if (model.value?.requirements) {
-        deploymentConfig.value.cpuCount = model.value.requirements.recommendedCpu;
-        deploymentConfig.value.memoryGB = model.value.requirements.recommendedMemory;
-        if (model.value.requirements.gpuRequired && model.value.requirements.recommendedGpu) {
-          deploymentConfig.value.gpuType = model.value.requirements.recommendedGpu;
+        deploymentConfig.value.cpuCount =
+          model.value.requirements.recommendedCpu;
+        deploymentConfig.value.memoryGB =
+          model.value.requirements.recommendedMemory;
+        if (
+          model.value.requirements.gpuRequired &&
+          model.value.requirements.recommendedGpu
+        ) {
+          deploymentConfig.value.gpuType =
+            model.value.requirements.recommendedGpu;
           deploymentConfig.value.gpuCount = 1;
         } else {
           deploymentConfig.value.gpuType = "";
         }
       }
-      
+
       // Set model name for deployment
       deploymentConfig.value.modelName = model.value.model;
-      
     } catch (err) {
       console.error("Error loading model:", err);
       error.value = err instanceof Error ? err.message : String(err);
@@ -197,14 +218,14 @@
   // Open deployment form
   const openDeploymentForm = async () => {
     if (!model.value) return;
-    
+
     showDeploymentForm.value = true;
-    
+
     // Load API keys when opening the form if not already loaded
     if (apiKeys.value.length === 0) {
       await loadApiKeys();
     }
-    
+
     // Set initial API key if available
     if (apiKeys.value.length > 0 && !deploymentConfig.value.apiKeyId) {
       deploymentConfig.value.apiKeyId = apiKeys.value[0].id;
@@ -225,13 +246,14 @@
   const deployModel = async () => {
     try {
       deploymentError.value = null;
-      
+
       // Validate API key selection
       if (!deploymentConfig.value.apiKeyId) {
-        deploymentError.value = "Please select an API key for VM authentication";
+        deploymentError.value =
+          "Please select an API key for VM authentication";
         return;
       }
-      
+
       isDeploying.value = true;
 
       // Call the API endpoint using apiCaller
@@ -348,8 +370,8 @@
   <div class="container max-w-6xl py-8">
     <!-- Back button and header -->
     <div class="flex items-center mb-6">
-      <button 
-        @click="router.push('/app/model-library')" 
+      <button
+        @click="router.push('/app/model-library')"
         class="flex items-center text-gray-400 hover:text-gray-200 transition-colors mr-4"
       >
         <ChevronLeftIcon class="h-5 w-5 mr-1" />
@@ -357,29 +379,42 @@
       </button>
       <SaasPageHeader class="mb-0">
         <template #title>Model Details</template>
-        <template #subtitle>Explore and deploy AI models for your team</template>
+        <template #subtitle
+          >Explore and deploy AI models for your team</template
+        >
       </SaasPageHeader>
     </div>
 
     <!-- Loading state -->
     <div v-if="isLoading" class="bg-card rounded-lg border p-8 text-foreground">
       <div class="flex flex-col gap-4 items-center justify-center py-12">
-        <svg 
-          class="animate-spin h-12 w-12 text-primary" 
-          xmlns="http://www.w3.org/2000/svg" 
-          fill="none" 
+        <svg
+          class="animate-spin h-12 w-12 text-primary"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
           viewBox="0 0 24 24"
         >
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="4"
+          ></circle>
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
         </svg>
         <p class="text-xl font-medium">Loading model information...</p>
       </div>
     </div>
 
     <!-- Error state -->
-    <div 
-      v-else-if="error" 
+    <div
+      v-else-if="error"
       class="bg-destructive/10 rounded-lg border border-destructive p-8 text-foreground"
     >
       <div class="flex flex-col gap-4 items-center justify-center py-12">
@@ -398,8 +433,8 @@
           />
         </svg>
         <p class="text-xl font-medium text-destructive">{{ error }}</p>
-        <button 
-          @click="loadModel" 
+        <button
+          @click="loadModel"
           class="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
         >
           Try Again
@@ -410,14 +445,24 @@
     <!-- Model details content -->
     <div v-else-if="model" class="space-y-6">
       <!-- Hero section with model banner -->
-      <div class="relative overflow-hidden h-64 bg-gradient-to-br rounded-t-lg border border-b-0" :class="getGradientClass(model.category)">
-        <img v-if="model.imageUrl" :src="model.imageUrl" class="w-full h-full object-cover opacity-30" />
+      <div
+        class="relative overflow-hidden h-64 w-36 bg-gradient-to-br rounded-t-lg border border-b-0"
+        :class="getGradientClass(model.category)"
+      >
+        <img
+          v-if="model.imageUrl"
+          :src="model.imageUrl"
+          class="w-full h-full object-cover opacity-30"
+        />
         <div class="absolute inset-0 flex flex-col justify-center p-8">
-          <span 
+          <span
             class="inline-flex items-center rounded-full px-3 py-0.5 text-sm font-medium shadow-sm mb-4"
             :class="getTagClass(model.category)"
           >
-            <component :is="getCategoryIcon(model.category)" class="h-4 w-4 mr-1" />
+            <component
+              :is="getCategoryIcon(model.category)"
+              class="h-4 w-4 mr-1"
+            />
             {{ model.category }}
           </span>
           <h1 class="text-4xl font-bold text-white mb-2">{{ model.name }}</h1>
@@ -443,7 +488,7 @@
             <p class="text-foreground/80 whitespace-pre-line mb-6">
               {{ model.fullDescription }}
             </p>
-            
+
             <!-- Tags -->
             <div class="flex flex-wrap gap-2 mb-4">
               <div class="flex items-center text-sm font-medium mr-2">
@@ -459,7 +504,7 @@
               </span>
             </div>
           </div>
-          
+
           <!-- Capabilities card -->
           <div class="bg-card rounded-lg border p-6 text-foreground">
             <h2 class="text-2xl font-semibold mb-4 flex items-center">
@@ -467,12 +512,16 @@
               Capabilities
             </h2>
             <ul class="list-disc pl-6 space-y-2">
-              <li v-for="(capability, index) in model.capabilities" :key="index" class="text-foreground/80">
+              <li
+                v-for="(capability, index) in model.capabilities"
+                :key="index"
+                class="text-foreground/80"
+              >
                 {{ capability }}
               </li>
             </ul>
           </div>
-          
+
           <!-- Use Cases card -->
           <div class="bg-card rounded-lg border p-6 text-foreground">
             <h2 class="text-2xl font-semibold mb-4 flex items-center">
@@ -480,12 +529,16 @@
               Use Cases
             </h2>
             <ul class="list-disc pl-6 space-y-2">
-              <li v-for="(useCase, index) in model.useCases" :key="index" class="text-foreground/80">
+              <li
+                v-for="(useCase, index) in model.useCases"
+                :key="index"
+                class="text-foreground/80"
+              >
                 {{ useCase }}
               </li>
             </ul>
           </div>
-          
+
           <!-- Version History -->
           <div class="bg-card rounded-lg border p-6 text-foreground">
             <h2 class="text-2xl font-semibold mb-4 flex items-center">
@@ -493,13 +546,25 @@
               Version History
             </h2>
             <div class="space-y-4">
-              <div v-for="(version, index) in model.versions" :key="index" class="border-l-2 border-primary/30 pl-4 pb-4">
+              <div
+                v-for="(version, index) in model.versions"
+                :key="index"
+                class="border-l-2 border-primary/30 pl-4 pb-4"
+              >
                 <div class="flex items-center mb-2">
-                  <span class="font-semibold mr-2">Version {{ version.version }}</span>
-                  <span class="text-sm text-foreground/60">{{ formatDate(version.releaseDate) }}</span>
+                  <span class="font-semibold mr-2"
+                    >Version {{ version.version }}</span
+                  >
+                  <span class="text-sm text-foreground/60">{{
+                    formatDate(version.releaseDate)
+                  }}</span>
                 </div>
                 <ul class="list-disc pl-6 space-y-1">
-                  <li v-for="(change, changeIndex) in version.changes" :key="changeIndex" class="text-sm text-foreground/80">
+                  <li
+                    v-for="(change, changeIndex) in version.changes"
+                    :key="changeIndex"
+                    class="text-sm text-foreground/80"
+                  >
                     {{ change }}
                   </li>
                 </ul>
@@ -507,7 +572,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Right column - Deployment and requirements -->
         <div class="space-y-6">
           <!-- Deploy button card -->
@@ -517,7 +582,8 @@
               Deploy Model
             </h2>
             <p class="text-foreground/80 mb-6">
-              Deploy this model to your private instance to start using it in your applications.
+              Deploy this model to your private instance to start using it in
+              your applications.
             </p>
             <button
               @click="openDeploymentForm"
@@ -527,7 +593,7 @@
               Deploy Now
             </button>
           </div>
-          
+
           <!-- System Requirements -->
           <div class="bg-card rounded-lg border p-6 text-foreground">
             <h2 class="text-xl font-semibold mb-4 flex items-center">
@@ -539,29 +605,40 @@
                 <h3 class="font-medium mb-2">CPU</h3>
                 <div class="flex items-center justify-between">
                   <span class="text-foreground/80">Minimum</span>
-                  <span class="font-medium">{{ model.requirements?.minCpu }} cores</span>
+                  <span class="font-medium"
+                    >{{ model.requirements?.minCpu }} cores</span
+                  >
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-foreground/80">Recommended</span>
-                  <span class="font-medium">{{ model.requirements?.recommendedCpu }} cores</span>
+                  <span class="font-medium"
+                    >{{ model.requirements?.recommendedCpu }} cores</span
+                  >
                 </div>
               </div>
-              
+
               <div>
                 <h3 class="font-medium mb-2">Memory</h3>
                 <div class="flex items-center justify-between">
                   <span class="text-foreground/80">Minimum</span>
-                  <span class="font-medium">{{ model.requirements?.minMemory }} GB</span>
+                  <span class="font-medium"
+                    >{{ model.requirements?.minMemory }} GB</span
+                  >
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-foreground/80">Recommended</span>
-                  <span class="font-medium">{{ model.requirements?.recommendedMemory }} GB</span>
+                  <span class="font-medium"
+                    >{{ model.requirements?.recommendedMemory }} GB</span
+                  >
                 </div>
               </div>
-              
+
               <div>
                 <h3 class="font-medium mb-2">GPU</h3>
-                <div v-if="model.requirements?.gpuRequired" class="flex items-center justify-between">
+                <div
+                  v-if="model.requirements?.gpuRequired"
+                  class="flex items-center justify-between"
+                >
                   <span class="text-foreground/80">Required</span>
                   <span class="font-medium">Yes</span>
                 </div>
@@ -569,25 +646,34 @@
                   <span class="text-foreground/80">Required</span>
                   <span class="font-medium">No (CPU only)</span>
                 </div>
-                <div v-if="model.requirements?.recommendedGpu" class="flex items-center justify-between">
+                <div
+                  v-if="model.requirements?.recommendedGpu"
+                  class="flex items-center justify-between"
+                >
                   <span class="text-foreground/80">Recommended</span>
-                  <span class="font-medium">{{ model.requirements?.recommendedGpu }}</span>
+                  <span class="font-medium">{{
+                    model.requirements?.recommendedGpu
+                  }}</span>
                 </div>
               </div>
             </div>
           </div>
-          
+
           <!-- Model ID info -->
           <div class="bg-card rounded-lg border p-6 text-foreground">
             <h2 class="text-xl font-semibold mb-4">Model Information</h2>
             <div class="space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-foreground/80">Model ID</span>
-                <span class="font-mono text-sm bg-muted px-2 py-1 rounded">{{ model.id }}</span>
+                <span class="font-mono text-sm bg-muted px-2 py-1 rounded">{{
+                  model.id
+                }}</span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-foreground/80">Model Name</span>
-                <span class="font-mono text-sm bg-muted px-2 py-1 rounded">{{ model.model }}</span>
+                <span class="font-mono text-sm bg-muted px-2 py-1 rounded">{{
+                  model.model
+                }}</span>
               </div>
             </div>
           </div>
@@ -650,25 +736,35 @@
               @click="checkStatus"
               class="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
             >
-              <svg 
-                v-if="!isDeploying" 
-                xmlns="http://www.w3.org/2000/svg" 
-                class="h-4 w-4 mr-2" 
-                fill="none" 
-                viewBox="0 0 24 24" 
+              <svg
+                v-if="!isDeploying"
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-4 w-4 mr-2"
+                fill="none"
+                viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
               </svg>
-              <svg 
-                v-else 
-                xmlns="http://www.w3.org/2000/svg" 
-                class="animate-spin h-4 w-4 mr-2" 
-                fill="none" 
-                viewBox="0 0 24 24" 
+              <svg
+                v-else
+                xmlns="http://www.w3.org/2000/svg"
+                class="animate-spin h-4 w-4 mr-2"
+                fill="none"
+                viewBox="0 0 24 24"
                 stroke="currentColor"
               >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
               </svg>
               Check Status
             </button>
@@ -708,15 +804,33 @@
                     required
                     class="w-full px-3 py-2 rounded-md border border-gray-600 bg-gray-800/50 text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none"
                   >
-                    <option v-if="isLoadingApiKeys" value="" disabled>Loading API Keys...</option>
-                    <option v-else-if="apiKeys.length === 0" value="" disabled>No API Keys Available</option>
-                    <option v-for="key in apiKeys" :key="key.id" :value="key.id">
-                      {{ key.name }} ({{ key.type === 'PERSONAL' ? 'Personal' : 'Team' }})
+                    <option v-if="isLoadingApiKeys" value="" disabled>
+                      Loading API Keys...
+                    </option>
+                    <option v-else-if="apiKeys.length === 0" value="" disabled>
+                      No API Keys Available
+                    </option>
+                    <option
+                      v-for="key in apiKeys"
+                      :key="key.id"
+                      :value="key.id"
+                    >
+                      {{ key.name }} ({{
+                        key.type === "PERSONAL" ? "Personal" : "Team"
+                      }})
                     </option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  <div
+                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"
+                  >
+                    <svg
+                      class="fill-current h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                      />
                     </svg>
                   </div>
                 </div>
@@ -742,9 +856,17 @@
                     <option :value="8">8 Cores</option>
                     <option :value="16">16 Cores</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  <div
+                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"
+                  >
+                    <svg
+                      class="fill-current h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                      />
                     </svg>
                   </div>
                 </div>
@@ -770,9 +892,17 @@
                     <option :value="32">32 GB</option>
                     <option :value="64">64 GB</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  <div
+                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"
+                  >
+                    <svg
+                      class="fill-current h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                      />
                     </svg>
                   </div>
                 </div>
@@ -797,9 +927,17 @@
                     <option value="nvidia-tesla-v100">NVIDIA Tesla V100</option>
                     <option value="nvidia-a100">NVIDIA A100</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  <div
+                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"
+                  >
+                    <svg
+                      class="fill-current h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                      />
                     </svg>
                   </div>
                 </div>
@@ -823,9 +961,17 @@
                     <option :value="2">2 GPUs</option>
                     <option :value="4">4 GPUs</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  <div
+                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"
+                  >
+                    <svg
+                      class="fill-current h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                      />
                     </svg>
                   </div>
                 </div>
@@ -850,12 +996,22 @@
                     <option value="us-east1">US East (South Carolina)</option>
                     <option value="us-west1-a">US West (Oregon)</option>
                     <option value="us-west4-a">US West (Las Vegas)</option>
-                    <option value="europe-west4">Europe West (Netherlands)</option>
+                    <option value="europe-west4">
+                      Europe West (Netherlands)
+                    </option>
                     <option value="asia-northeast3">Asia East (Taiwan)</option>
                   </select>
-                  <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400">
-                    <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
-                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                  <div
+                    class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-400"
+                  >
+                    <svg
+                      class="fill-current h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"
+                      />
                     </svg>
                   </div>
                 </div>
@@ -876,15 +1032,26 @@
                 :disabled="isDeploying || !deploymentConfig.apiKeyId"
                 class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg 
-                  v-if="isDeploying" 
-                  class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" 
-                  xmlns="http://www.w3.org/2000/svg" 
-                  fill="none" 
+                <svg
+                  v-if="isDeploying"
+                  class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
                   viewBox="0 0 24 24"
                 >
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  ></circle>
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
                 </svg>
                 {{ isDeploying ? "Deploying Model..." : "Deploy Model" }}
               </button>

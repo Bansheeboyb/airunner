@@ -443,10 +443,30 @@
   };
 
   // Computed properties
-  const filteredByStatus = computed(() => {
-    // Group VMs by status
+  const filteredByTeamAndStatus = computed(() => {
+    // Filter VMs by current team first
+    const teamFilteredVms = userVms.value.filter((vm) => {
+      // Check if the VM has team_id label matching the current team
+      const vmTeamId = vm.labels?.team_id;
+      const currentTeamId = currentTeam.value?.id;
+      
+      // If no currentTeamId is available, show all VMs (fallback)
+      if (!currentTeamId) return true;
+      
+      // If VM has no team_id label, use a fallback check (if needed)
+      if (!vmTeamId) {
+        // Fallback: could use other VM properties to determine team ownership
+        // For example, check if the VM name contains the team name or ID
+        return false; // Exclude VMs without team_id (adjust if needed)
+      }
+      
+      // Compare the VM's team_id with the current team's ID
+      return vmTeamId === currentTeamId.toString();
+    });
+    
+    // Group filtered VMs by status
     const result: Record<string, Vm[]> = {};
-    userVms.value.forEach((vm) => {
+    teamFilteredVms.forEach((vm) => {
       if (!result[vm.status]) {
         result[vm.status] = [];
       }
@@ -454,6 +474,9 @@
     });
     return result;
   });
+  
+  // Legacy filteredByStatus for compatibility (points to the team-filtered version)
+  const filteredByStatus = computed(() => filteredByTeamAndStatus.value);
 
   // View VM details
   const viewVmDetails = (vm: Vm) => {

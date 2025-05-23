@@ -23,7 +23,7 @@
     "db:studio": "pnpm --filter database run db:studio"
   },
   "dependencies": {
-    "@unhead/vue": "^1.11.14",
+    "@unhead/vue": "^2.0.10",
     "crypto": "^1.0.1",
     "eslint": "8.57.0",
     "eslint-config-custom": "workspace:*",

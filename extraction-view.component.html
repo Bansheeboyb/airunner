@@ -1,0 +1,281 @@
+<div class="extraction-view">
+
+  <!-- ── Upload Card ──────────────────────────────────────────── -->
+  @if (upload.isIdle() || (!upload.isBusy() && !upload.isComplete() && !upload.isError())) {
+    <div class="glass-card">
+      <div class="grid md:grid-cols-2 gap-8">
+        <!-- Left: file picker -->
+        <div>
+          <h3 class="section-header">Upload Contract</h3>
+          <div class="upload-area" [class.has-file]="selectedFile()">
+            <div class="upload-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+            <p class="upload-text">Drag and drop your PDF here, or click to browse</p>
+            <input
+              type="file"
+              accept=".pdf,.docx,.txt"
+              class="file-input"
+              (change)="onFileSelected($event)"
+            />
+            <button class="upload-btn">Select File</button>
+          </div>
+
+          @if (selectedFile(); as file) {
+            <div class="file-chip">
+              <svg class="file-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+              </svg>
+              <div class="file-chip-info">
+                <span class="file-chip-name">{{ file.name }}</span>
+                <span class="file-chip-size">{{ (file.size / 1024 / 1024).toFixed(1) }} MB</span>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Right: start button -->
+        <div>
+          <h3 class="section-header">Extract Rules</h3>
+          @if (!selectedFile()) {
+            <div class="alert alert-info">
+              Upload a PDF contract to begin extraction
+            </div>
+          } @else {
+            <div class="ready-box">
+              <div class="ready-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                </svg>
+              </div>
+              <p class="ready-title">Ready to Extract</p>
+              <p class="ready-text">
+                AI will analyze your contract and extract all reimbursement rules automatically.
+              </p>
+              <button (click)="startExtraction()" class="btn-extract">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                </svg>
+                Start Extraction
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ── Processing Pipeline Card ─────────────────────────────── -->
+  @if (upload.isUploading() || upload.isProcessing() || upload.isComplete() || upload.isError()) {
+    <div class="glass-card pipeline-card">
+      <!-- Header with file info -->
+      <div class="pipeline-header">
+        <div class="pipeline-header-left">
+          <h3 class="section-header" style="margin-bottom: 0">
+            @if (upload.isComplete()) {
+              Extraction Complete
+            } @else if (upload.isError()) {
+              Extraction Failed
+            } @else {
+              Processing Pipeline
+            }
+          </h3>
+          <span class="pipeline-filename">{{ upload.filename() }}</span>
+        </div>
+        <div class="pipeline-header-right">
+          @if (upload.isProcessing()) {
+            <span class="pipeline-badge processing">
+              <span class="badge-dot"></span>
+              Processing
+            </span>
+          } @else if (upload.isUploading()) {
+            <span class="pipeline-badge uploading">
+              <span class="badge-dot"></span>
+              Uploading
+            </span>
+          } @else if (upload.isComplete()) {
+            <span class="pipeline-badge complete">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="badge-check">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Complete
+            </span>
+          } @else if (upload.isError()) {
+            <span class="pipeline-badge error">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="badge-check">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+              Failed
+            </span>
+          }
+        </div>
+      </div>
+
+      <!-- Upload phase -->
+      @if (upload.isUploading()) {
+        <div class="upload-phase">
+          <div class="upload-phase-spinner"></div>
+          <p class="upload-phase-text">Uploading document to cloud...</p>
+        </div>
+      }
+
+      <!-- Horizontal Stage Timeline -->
+      @if (upload.isProcessing() || upload.isComplete() || upload.isError()) {
+        <div class="h-timeline">
+          @for (stage of stages; track stage.number) {
+            <div
+              class="h-stage"
+              [class.completed]="isStageCompleted(stage.number)"
+              [class.active]="isStageActive(stage.number)"
+              [class.error]="upload.isError() && isStageActive(stage.number)"
+            >
+              <!-- Connector line (between stages) -->
+              @if (stage.number > 0) {
+                <div class="h-connector" [class.filled]="isStageCompleted(stage.number) || isStageActive(stage.number)"></div>
+              }
+
+              <!-- Circle -->
+              <div class="h-circle">
+                @if (isStageCompleted(stage.number)) {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                } @else if (isStageActive(stage.number) && !upload.isError()) {
+                  <div class="spinner-ring"></div>
+                } @else if (upload.isError() && isStageActive(stage.number)) {
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                } @else {
+                  <span class="h-number">{{ stage.number }}</span>
+                }
+              </div>
+
+              <!-- Label below -->
+              <div class="h-label">
+                <div class="h-name">{{ stage.name }}</div>
+                <div class="h-desc">
+                  @if (isStageCompleted(stage.number) && getStageDuration(stage.number); as dur) {
+                    {{ dur }}
+                  } @else if (isStageActive(stage.number) && upload.isError()) {
+                    Failed
+                  } @else if (isStageActive(stage.number)) {
+                    In progress...
+                  }
+                </div>
+              </div>
+            </div>
+          }
+        </div>
+
+        <!-- Overall progress bar -->
+        <div class="overall-progress">
+          <div class="overall-bar-track">
+            <div
+              class="overall-bar-fill"
+              [class.complete]="upload.isComplete()"
+              [class.error]="upload.isError()"
+              [style.width.%]="upload.percentComplete()"
+            ></div>
+          </div>
+          <span class="overall-percent">{{ upload.percentComplete() }}%</span>
+        </div>
+      }
+
+      <!-- Error actions -->
+      @if (upload.isError()) {
+        <div class="pipeline-actions">
+          @if (upload.errorInfo()?.is_retryable) {
+            <button (click)="startExtraction()" class="btn-extract">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+              </svg>
+              Retry
+            </button>
+          }
+          <button (click)="reset()" class="btn-outline">Upload Different File</button>
+        </div>
+      }
+
+      <!-- Complete actions -->
+      @if (upload.isComplete()) {
+        <div class="pipeline-actions">
+          <button (click)="reset()" class="btn-outline">Upload Another</button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ── Results Card ─────────────────────────────────────────── -->
+  <div class="glass-card">
+    <h3 class="section-header">Extraction Results</h3>
+
+    @if (upload.isComplete() && upload.result(); as res) {
+      @if (res.summary; as summary) {
+        <div class="results-banner">
+          <svg class="results-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+          <div>
+            <p class="results-banner-title">Analysis Complete</p>
+            <p class="results-banner-sub">
+              Found {{ summary.rules_discovered }} rules across {{ summary.pages_processed }} pages
+              with {{ (summary.confidence_score * 100).toFixed(0) }}% confidence
+            </p>
+          </div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-card metric-teal">
+            <div class="metric-value">{{ summary.pages_processed }}</div>
+            <div class="metric-label">Total Pages</div>
+          </div>
+          <div class="metric-card metric-blue">
+            <div class="metric-value">--</div>
+            <div class="metric-label">Rule Sections</div>
+          </div>
+          <div class="metric-card metric-green">
+            <div class="metric-value">{{ summary.rules_discovered }}</div>
+            <div class="metric-label">Total Rules</div>
+          </div>
+          <div class="metric-card metric-purple">
+            <div class="metric-value">{{ (summary.confidence_score * 100).toFixed(0) }}%</div>
+            <div class="metric-label">Confidence</div>
+          </div>
+        </div>
+      }
+    } @else {
+      <p class="placeholder-text">
+        Upload a contract and click "Start Extraction" to see results here.
+      </p>
+      <div class="metrics-grid">
+        <div class="metric-card metric-teal">
+          <div class="metric-value">--</div>
+          <div class="metric-label">Total Pages</div>
+        </div>
+        <div class="metric-card metric-blue">
+          <div class="metric-value">--</div>
+          <div class="metric-label">Rule Sections</div>
+        </div>
+        <div class="metric-card metric-green">
+          <div class="metric-value">--</div>
+          <div class="metric-label">Total Rules</div>
+        </div>
+        <div class="metric-card metric-purple">
+          <div class="metric-value">--</div>
+          <div class="metric-label">Confidence</div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

@@ -1,0 +1,21 @@
+<div class="health-saas-app">
+  <div class="app-layout">
+    <app-left-sidebar />
+
+    <main class="main-content">
+      <app-content-header />
+
+      <div class="content-scroll">
+        <div class="content-wrapper">
+          <app-header />
+
+          <div class="view-body">
+            <router-outlet />
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<app-toast-container />

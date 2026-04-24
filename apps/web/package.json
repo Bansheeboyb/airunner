@@ -40,7 +40,7 @@
     "radix-vue": "^1.9.12",
     "shadcn-nuxt": "^0.11.3",
     "tailwind-merge": "^2.6.0",
-    "trpc-nuxt": "^0.10.22",
+    "trpc-nuxt": "^1.2.0",
     "ufo": "^1.5.4",
     "utils": "workspace:*",
     "uuid": "^11.0.5",
